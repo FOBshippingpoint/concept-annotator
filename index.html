@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bootstrap w/ Vite</title>
+  </head>
+  <body>
+    <div id="dropzone">拖曳檔案到此處</div>
+    <input type="file" id="uploadFile"></input>
+      <template class="concept">
+        <div class="concept">
+          &#x1F4D4;[<span title="CUI" class="cui"></span>]
+          <dfn class="preferredName"></dfn>
+          <div class="semanticTypes">
+            Semantic Types:
+            <slot name="semanticTypes"></slot>
+          </div>
+          <hr>
+          <div class="synonyms"></div>
+          <hr>
+          <div>
+            <slot name="definitions"></slot>
+          </div>
+          <hr>
+          <details class="childConcepts">
+            <summary>
+            Broader Concepts:
+            </summary>
+            <slot name="broaderConcepts"></slot>
+          </details>
+          <details class="childConcepts">
+            <summary>
+            Narrower Concepts:
+            </summary>
+            <slot name="narrowerConcepts"></slot>
+          </details>
+        </div>
+      </template>
+      <template class="definition">
+          <div class="sourceName"></div>
+          <div class="meaning"></div>
+      </template>
+      <template class="semanticType">
+      </template>
+      <template class="childConcept">
+        <div class="childConcept">
+          [<span class="cui"></span>] <dfn class="preferredName"></dfn>
+        </div>
+      </template>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

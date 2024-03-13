@@ -1,0 +1,154 @@
+.tag {
+  position: absolute;
+  padding: 2px 5px;
+  font-size: 15px;
+  color: #4485ea;
+}
+
+/* .r6o-widget.comment.editable { */
+/*   display: none; */
+/* } */
+
+#dropzone {
+  height: 150px; /* Adjust height as needed */
+  border: 2px dashed #ccc; /* Optional dashed border */
+  border-radius: 5px; /* Rounded corners */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer; /* Indicate clickable area */
+  margin: 10px auto; /* Optional margin for centering */
+  background: #f2f2f2; /* Light gray background */
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.1); /* Subtle inner shadow */
+}
+
+#dropzone.dragover {
+  background: #e6e6e6; /* Slightly darker background on drag-over */
+  box-shadow: inset 0 0 0 4px rgba(0, 0, 0, 0.2); /* More prominent inner shadow */
+}
+
+#uploadFile {
+  display: none;
+}
+
+.documentContainer {
+  padding: 1rem 1.4rem;
+  border: 1px solid #222;
+  border-radius: 4px;
+}
+
+.document {
+  line-height: 3;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 1000px;
+  padding: 2rem;
+  overflow-x: hidden;
+}
+
+.concept {
+  padding: 1rem 1.4rem;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+}
+
+.sourceName {
+  margin-top: 4px;
+  padding: 2px 8px;
+  background-color: powderblue;
+  border-radius: 100px;
+  width: fit-content;
+  font-size: 12px;
+}
+
+.meaning {
+  font-size: 80%;
+  padding-left: 20px;
+  color: #222;
+}
+
+.semanticTypes {
+  font-size: 90%;
+  margin-top: 5px;
+  text-align: right;
+}
+
+.concept hr {
+  border: 0;
+  border-top: 1px solid #eee;
+}
+
+.synonyms {
+  font-size: 80%;
+}
+
+.childConcept {
+  padding-left: 20px;
+}
+
+details {
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+  transition: 50ms;
+}
+details[open] {
+  padding-bottom: 1em;
+}
+
+summary::before,
+summary::after {
+  color: #ccc;
+  transition: 200ms;
+}
+
+@layer markers {
+  summary {
+    position: relative;
+  }
+  summary::marker {
+    content: none;
+  }
+  summary::before,
+  summary::after {
+    content: "";
+  }
+  summary::before,
+  summary::after {
+    width: 0.75em;
+    height: 0;
+    border-bottom: 2px solid;
+    position: absolute;
+    top: calc(50% - 1px);
+    right: 0;
+    transform: translateY(-50%);
+  }
+  summary::after {
+    transform: rotate(90deg);
+    transform-origin: 50% 50%;
+  }
+  [open] summary::after {
+    transform: rotate(0deg);
+  }
+}
+
+/* styles ported over from the second example */
+@layer step2styles {
+  details {
+    border: 1px solid #ccc;
+    padding: 0 1rem;
+  }
+  details[open] {
+    padding-bottom: 1em;
+  }
+  summary {
+    padding: 1rem 2em 1rem 0;
+    cursor: pointer;
+  }
+}
+
+aside {
+  width: 38em;
+  max-width: 98vw;
+}
