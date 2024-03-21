@@ -14,10 +14,16 @@ export function $(el, selector) {
 /**
  * Select many as array
  */
-export function $$(selector) {
-	return [...document.querySelectorAll(selector)];
+export function $$(el, selector) {
+	if (typeof el == "string" && selector === undefined) {
+		selector = el;
+		el = document;
+	}
+	return [...el.querySelectorAll(selector)];
 }
 
 export function $$$(tagName, options) {
   return document.createElement(tagName, options)
 }
+
+EventTarget.prototype.on = EventTarget.prototype.addEventListener;

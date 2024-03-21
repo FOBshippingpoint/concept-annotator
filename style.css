@@ -3,11 +3,12 @@
   padding: 2px 5px;
   font-size: 15px;
   color: #4485ea;
+  opacity: 0.3;
 }
 
-/* .r6o-widget.comment.editable { */
-/*   display: none; */
-/* } */
+.tag:hover {
+  opacity: 1;
+}
 
 #dropzone {
   height: 150px; /* Adjust height as needed */
@@ -37,21 +38,32 @@
   border-radius: 4px;
 }
 
+.documentContainer + .documentContainer {
+  margin-top: 10px;
+}
+
 .document {
   line-height: 3;
+  overflow-x: scroll;
+  white-space: pre-wrap;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 60em;
+  padding: 20px 0px;
 }
 
 body {
-  margin: 0 auto;
-  max-width: 1000px;
-  padding: 2rem;
+  margin: 0;
+  padding: 0;
   overflow-x: hidden;
 }
 
 .concept {
   padding: 1rem 1.4rem;
   border: 1px solid #aaa;
-  border-radius: 4px;
+  border-radius: 0.5em;
 }
 
 .sourceName {
@@ -75,7 +87,7 @@ body {
   text-align: right;
 }
 
-.concept hr {
+hr {
   border: 0;
   border-top: 1px solid #eee;
 }
@@ -148,7 +160,95 @@ summary::after {
   }
 }
 
-aside {
-  width: 38em;
-  max-width: 98vw;
+.drawerContainer {
+  position: relative;
+  min-height: 100vh;
+}
+
+.drawer {
+  z-index: 999;
+  margin: auto;
+  display: flex;
+  position: absolute;
+  align-items: stretch;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 23em;
+  transform: translateX(100%);
+  transition: transform 0.1s ease-in-out; /* Smooth slide animation */
+}
+
+.innerDrawer {
+  width: 100%;
+  background-color: #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  overflow-y: scroll;
+  overflow-x: hidden;
+}
+
+.innerDrawer .flex {
+  display: flex; /* Enable flexbox for layout */
+  padding: 0.5em;
+  flex-direction: column; /* Arrange elements vertically */
+  gap: 0.5em;
+}
+
+.drawer.open {
+  transform: translateX(0);
+}
+
+.conceptSearch input {
+  position: sticky;
+  padding: 5px;
+  width: 100%;
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+#toggleConceptSearchBtn {
+  /* margin-top: 10px; */
+  width: 3em;
+  height: 3em;
+  font-weight: bold;
+  /* bottom: 0; */
+  /* color: white; */
+  border-radius: 0.2em;
+  border: none;
+  cursor: pointer;
+  background-color: #fff;
+  position: absolute;
+  bottom: 10px; /* Adjust for spacing from bottom */
+  transform: translateX(-98%);
+  background-color: #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  clip-path: inset(-5px 0px -5px -5px);
+}
+
+#toggleConceptSearchBtn:hover {
+  background-color: #eee;
+  cursor: pointer;
+}
+
+.concepts {
+  flex: 1 1 auto;
+}
+
+.conceptHeader {
+  display: flex;
+  align-items: center;
+}
+
+.conceptHeader button {
+  background-color: #ffffff00;
+  color: #000;
+  border: none;
+  cursor: pointer;
+}
+
+.conceptHeader button:active {
+  background-color: #ffffff00;
+  color: #aaa;
+  border: none;
+  cursor: pointer;
 }

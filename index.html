@@ -1,53 +1,95 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Bootstrap w/ Vite</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>概念標記工具</title>
   </head>
-  <body>
-    <div id="dropzone">拖曳檔案到此處</div>
-    <input type="file" id="uploadFile"></input>
-      <template class="concept">
-        <div class="concept">
-          &#x1F4D4;[<span title="CUI" class="cui"></span>]
+  <body class="drawerContainer">
+    <main>
+      <slot name="documents"></slot>
+      <div id="dropzone">➕拖曳檔案到此處</div>
+      <input type="file" id="uploadFile" />
+    </main>
+    <aside class="drawer open">
+      <div class="innerDrawer toggleConceptSearch">
+        <div class="flex">
+          <div class="conceptSearch">
+            <input placeholder="搜尋UMLS概念" />
+          </div>
+          <div class="concepts">
+            <slot name="concepts"></slot>
+          </div>
+        </div>
+      </div>
+      <button class="toggleConceptSearch" id="toggleConceptSearchBtn" title="展開/收合UMLS搜尋面板">
+        ＞
+      </button>
+    </aside>
+    <template class="documentContainer">
+      <div class="documentContainer">
+        <div class="header"></div>
+        <hr />
+        <pre class="document"></pre>
+        <hr />
+        <button class="export">匯出</button>
+        <button class="save">儲存</button>
+        <button class="delete">刪除</button>
+      </div>
+    </template>
+    <template class="concept">
+      <div class="concept">
+        <div class="conceptHeader">
+          <button title="複製CUI">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              fill="currentColor"
+              class="bi bi-copy"
+              viewBox="0 0 16 16"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1z"
+              />
+            </svg>
+          </button>
+          [<a title="CUI" class="cui" href="#"></a>]
           <dfn class="preferredName"></dfn>
-          <div class="semanticTypes">
-            Semantic Types:
-            <slot name="semanticTypes"></slot>
-          </div>
-          <hr>
-          <div class="synonyms"></div>
-          <hr>
-          <div>
-            <slot name="definitions"></slot>
-          </div>
-          <hr>
-          <details class="childConcepts">
-            <summary>
-            Broader Concepts:
-            </summary>
-            <slot name="broaderConcepts"></slot>
-          </details>
-          <details class="childConcepts">
-            <summary>
-            Narrower Concepts:
-            </summary>
-            <slot name="narrowerConcepts"></slot>
-          </details>
         </div>
-      </template>
-      <template class="definition">
-          <div class="sourceName"></div>
-          <div class="meaning"></div>
-      </template>
-      <template class="semanticType">
-      </template>
-      <template class="childConcept">
-        <div class="childConcept">
-          [<span class="cui"></span>] <dfn class="preferredName"></dfn>
+        <div class="semanticTypes">
+          Semantic Types:
+          <slot name="semanticTypes"></slot>
         </div>
-      </template>
+        <hr />
+        <div class="synonyms"></div>
+        <hr />
+        <details>
+          <summary>Definitions</summary>
+          <slot name="definitions"></slot>
+        </details>
+        <hr />
+        <details class="childConcepts">
+          <summary>Broader Concepts:</summary>
+          <slot name="broaderConcepts"></slot>
+        </details>
+        <details class="childConcepts">
+          <summary>Narrower Concepts:</summary>
+          <slot name="narrowerConcepts"></slot>
+        </details>
+      </div>
+    </template>
+    <template class="definition">
+      <div class="sourceName"></div>
+      <div class="meaning"></div>
+    </template>
+    <template class="semanticType"> </template>
+    <template class="childConcept">
+      <div class="childConcept">
+        [<a class="cui" href="#"></a>] <dfn class="preferredName"></dfn>
+      </div>
+    </template>
     <script type="module" src="/main.js"></script>
   </body>
 </html>
