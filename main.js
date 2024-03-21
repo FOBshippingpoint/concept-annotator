@@ -5,7 +5,7 @@ import "@recogito/recogito-js/dist/recogito.min.css";
 import debounceTrailing from "./debounceTrailing.js";
 import { createAnnotationDoc, documentStore } from "./documentStore.js";
 
-const UMLS_BASE_URL = import.meta.env.VITE_UMLS_BASE_URL;
+const UMLS_BASE_URL = import.meta.env.VITE_UMLS_BASE_URL ?? "";
 
 function addTagForElement(el, textContent, documentId) {
   const tag = $$$("dfn");
