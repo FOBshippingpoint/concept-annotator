@@ -329,18 +329,14 @@ function createConceptRepresentation(concept) {
   $(container, ".importCui").on("click", () => {
     const tagInput = $(".r6o-autocomplete input");
     if (tagInput) {
-      tagInput.value = concept.cui + "$";
-      tagInput.focus();
-      tagInput.setSelectionRange(concept.cui.length, concept.cui.length + 1);
-      $("#deleteTip").style.display = "inline";
-      adjustElementPosition($("#deleteTip"), tagInput);
-      const removeTip = (e) => {
-        if (e.key == "Enter") {
-          $("#deleteTip").style.display = "none";
-          tagInput.off("keydown", removeTip);
-        }
-      };
-      tagInput.on("keydown", removeTip);
+      tagInput.value = concept.cui;
+      // 用input event騙react
+      tagInput.dispatchEvent(new InputEvent("input"));
+      // 緊接著用keydown Enter觸發將文字變成一個tag的指令
+      // 注意不能直接接在input event下面，我也不知道為什麼
+      queueMicrotask(() =>
+        tagInput.dispatchEvent(new KeyboardEvent("keydown", { which: 13 })),
+      );
     } else {
       alert("請先選擇要匯入CUI標籤的文字");
     }
@@ -501,10 +497,14 @@ $("#searchOnSelection").on("change", () => {
   localStorage.setItem("isSearchOnSelection", isSearchOnSelection.toString());
 });
 
-// init data
-$('[name="concepts"]').innerHTML = "";
-if (Array.isArray(data.data)) {
-  $('[name="concepts"]').append(...data.data.map(createConcept));
-} else {
-  $('[name="concepts"]').append(createConcept(json.data));
+function initData() {
+  // init data
+  $('[name="concepts"]').innerHTML = "";
+  if (Array.isArray(data.data)) {
+    $('[name="concepts"]').append(...data.data.map(createConcept));
+  } else {
+    $('[name="concepts"]').append(createConcept(json.data));
+  }
 }
+
+false && initData();
