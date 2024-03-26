@@ -309,16 +309,17 @@ summary::after {
   display: none;
 }
 
-/* .conceptHeader button { */
-/*   background-color: #ffffff00; */
-/*   color: #000; */
-/*   border: none; */
-/*   cursor: pointer; */
-/* } */
-/**/
-/* .conceptHeader button:active { */
-/*   background-color: #ffffff00; */
-/*   color: #aaa; */
-/*   border: none; */
-/*   cursor: pointer; */
-/* } */
+.conceptRepresentation button {
+  padding: 0;
+  vertical-align: middle;
+  background-color: #ffffff00;
+  border: none;
+  cursor: pointer;
+}
+
+.conceptRepresentation button:active {
+  background-color: #ffffff00;
+  color: #8f9193;
+  border: none;
+  cursor: pointer;
+}

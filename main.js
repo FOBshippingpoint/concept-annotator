@@ -4,6 +4,7 @@ import { $, $$, $$$ } from "./dollars.js";
 import "@recogito/recogito-js/dist/recogito.min.css";
 import debounceTrailing from "./debounceTrailing.js";
 import { createAnnotationDoc, documentStore } from "./documentStore.js";
+import { data } from "./data.js";
 
 const UMLS_BASE_URL = import.meta.env.VITE_UMLS_BASE_URL ?? "";
 
@@ -270,40 +271,10 @@ async function saveFile(blob, suggestedName) {
 }
 
 /** @param concept {Concept} */
-function insertConcept(concept) {
+function createConcept(concept) {
   const container = $("template.concept").content.cloneNode(true);
-  $(container, ".importCui").on("click", () => {
-    const tagInput = $(".r6o-autocomplete input");
-    if (tagInput) {
-      tagInput.value = concept.cui + "$";
-      tagInput.focus();
-      tagInput.setSelectionRange(concept.cui.length, concept.cui.length + 1);
-      $("#deleteTip").style.display = "inline";
-      adjustElementPosition($("#deleteTip"), tagInput);
-      const removeTip = (e) => {
-        if (e.key == "Enter") {
-          $("#deleteTip").style.display = "none";
-          tagInput.off("keydown", removeTip);
-        }
-      };
-      tagInput.on("keydown", removeTip);
-    }
-  });
-  $(container, ".copyCui").on("click", () => {
-    try {
-      navigator.clipboard.writeText(concept.cui);
-    } catch (error) {
-      console.error(error);
-    }
-  });
-
-  const representation = $("template.conceptRepresentation").content.cloneNode(
-    true,
-  );
-  $(representation, ".cui").textContent = concept.cui;
-  $(representation, ".cui").href =
-    "https://uts.nlm.nih.gov/uts/umls/concept/" + concept.cui;
-  $(representation, ".preferredName").textContent = concept.preferredName;
+  const representation = createConceptRepresentation(concept);
+  $(representation, ".searchCui").remove();
   $(container, '[name="conceptRepresentation"]').append(representation);
 
   $(container, ".synonyms").textContent =
@@ -325,29 +296,67 @@ function insertConcept(concept) {
     $(container, '[name="definitions"]').appendChild(def);
   }
   $(container, '[name="broaderConcepts"]').append(
-    ...insertChildConceptNodeList(concept.broaderConcepts),
+    ...createChildConceptNodeList(concept.broaderConcepts),
   );
   $(container, '[name="narrowerConcepts"]').append(
-    ...insertChildConceptNodeList(concept.narrowerConcepts),
+    ...createChildConceptNodeList(concept.narrowerConcepts),
   );
   return container;
 }
 
-function insertChildConceptNodeList(concepts) {
-  const result = concepts.map((c) => {
-    const child = $("template.conceptRepresentation").content.cloneNode(true);
-    $(child, ".cui").textContent = c.cui;
-    $(child, ".cui").href = "https://uts.nlm.nih.gov/uts/umls/concept/" + c.cui;
-    $(child, ".preferredName").textContent = c.preferredName;
-    return child;
-  });
+function createChildConceptNodeList(concepts) {
+  const result = concepts.map(createConceptRepresentation);
   if (result.length == 0) {
-    const child = $("template.conceptRepresentation").content.cloneNode(true);
-    $(child, ".cui").textContent = "None";
-    return [child];
+    const representation = $(
+      "template.conceptRepresentation",
+    ).content.cloneNode(true);
+    $(representation, ".importCui").style.display = "none";
+    $(representation, ".copyCui").style.display = "none";
+    $(representation, ".cui").textContent = "None";
+    return [representation];
   } else {
     return result;
   }
+}
+
+function createConceptRepresentation(concept) {
+  const container = $("template.conceptRepresentation").content.cloneNode(true);
+  $(container, ".cui").textContent = concept.cui;
+  $(container, ".cui").href =
+    "https://uts.nlm.nih.gov/uts/umls/concept/" + concept.cui;
+  $(container, ".preferredName").textContent = concept.preferredName;
+
+  $(container, ".importCui").on("click", () => {
+    const tagInput = $(".r6o-autocomplete input");
+    if (tagInput) {
+      tagInput.value = concept.cui + "$";
+      tagInput.focus();
+      tagInput.setSelectionRange(concept.cui.length, concept.cui.length + 1);
+      $("#deleteTip").style.display = "inline";
+      adjustElementPosition($("#deleteTip"), tagInput);
+      const removeTip = (e) => {
+        if (e.key == "Enter") {
+          $("#deleteTip").style.display = "none";
+          tagInput.off("keydown", removeTip);
+        }
+      };
+      tagInput.on("keydown", removeTip);
+    } else {
+      alert("請先選擇要匯入CUI標籤的文字");
+    }
+  });
+  $(container, ".copyCui").on("click", () => {
+    try {
+      navigator.clipboard.writeText(concept.cui);
+    } catch (error) {
+      console.error(error);
+    }
+  });
+  $(container, ".searchCui").on("click", () => {
+    searchConcept(concept.cui);
+  });
+
+  return container;
 }
 
 const updateConcepts = debounceTrailing(async () => {
@@ -383,9 +392,9 @@ const updateConcepts = debounceTrailing(async () => {
       } else {
         $('[name="concepts"]').innerHTML = "";
         if (Array.isArray(json.data)) {
-          $('[name="concepts"]').append(...json.data.map(insertConcept));
+          $('[name="concepts"]').append(...json.data.map(createConcept));
         } else {
-          $('[name="concepts"]').append(insertConcept(json.data));
+          $('[name="concepts"]').append(createConcept(json.data));
         }
       }
     }
@@ -473,12 +482,16 @@ const observer = new MutationObserver((mutationList, observer) => {
   for (const mutationRecord of mutationList) {
     const target = mutationRecord.target;
     if (target.classList.contains("r6o-selection")) {
-      $("#searchBar").value = target.textContent;
-      $("#searchBar").dispatchEvent(new Event("search"));
+      searchConcept(target.textContent);
     }
   }
 });
 observer.observe($("main"), { subtree: true, childList: true });
+
+function searchConcept(keyword) {
+  $("#searchBar").value = keyword;
+  $("#searchBar").dispatchEvent(new Event("search"));
+}
 
 $("#searchBar").on("search", updateConcepts);
 $("#searchBar").on("input", updateConcepts);
@@ -487,3 +500,11 @@ $("#searchOnSelection").on("change", () => {
   isSearchOnSelection = !isSearchOnSelection;
   localStorage.setItem("isSearchOnSelection", isSearchOnSelection.toString());
 });
+
+// init data
+$('[name="concepts"]').innerHTML = "";
+if (Array.isArray(data.data)) {
+  $('[name="concepts"]').append(...data.data.map(createConcept));
+} else {
+  $('[name="concepts"]').append(createConcept(json.data));
+}
