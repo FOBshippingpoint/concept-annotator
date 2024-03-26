@@ -462,7 +462,11 @@ function getCoords(el) {
 }
 
 // select text auto fill search bar.
-let isSearchOnSelection = $("#searchOnSelection").checked;
+let isSearchOnSelection = true;
+try {
+  isSearchOnSelection = JSON.parse(localStorage.getItem("isSearchOnSelection"));
+} catch (error) {}
+$("#searchOnSelection").checked = isSearchOnSelection;
 const observer = new MutationObserver((mutationList, observer) => {
   if (!isSearchOnSelection) return;
 
@@ -481,4 +485,5 @@ $("#searchBar").on("input", updateConcepts);
 
 $("#searchOnSelection").on("change", () => {
   isSearchOnSelection = !isSearchOnSelection;
+  localStorage.setItem("isSearchOnSelection", isSearchOnSelection.toString());
 });
