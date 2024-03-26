@@ -177,10 +177,8 @@ function insertAnnotationDoc(annotationDoc) {
     });
   }
 
-  r.on("selectAnnotation", async (annotation, element) => {
-    console.log(element);
-  });
   r.on("createAnnotation", async (annotation, overrideId) => {
+    console.log("createAnnotation", annotation);
     const el = $(`[data-id="${annotation.id}"]`);
     addTagForElement(
       el,
@@ -335,9 +333,10 @@ function createConceptRepresentation(concept) {
       tagInput.dispatchEvent(new InputEvent("input"));
       // 緊接著用keydown Enter觸發將文字變成一個tag的指令
       // 注意不能直接接在input event下面，我也不知道為什麼
-      queueMicrotask(() =>
-        tagInput.dispatchEvent(new KeyboardEvent("keydown", { which: 13 })),
-      );
+      // 只能用setTimeout不能用queueMicrotask，而且時間不能設成0，不然會變成註解兩次，原因不明
+      setTimeout(() => {
+        tagInput.dispatchEvent(new KeyboardEvent("keydown", { which: 13 }));
+      }, 1);
     } else {
       alert("請先選擇要匯入CUI標籤的文字");
     }
