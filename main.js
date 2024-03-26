@@ -310,8 +310,9 @@ function createChildConceptNodeList(concepts) {
     const representation = $(
       "template.conceptRepresentation",
     ).content.cloneNode(true);
-    $(representation, ".importCui").style.display = "none";
-    $(representation, ".copyCui").style.display = "none";
+    $(representation, ".importCui").remove();
+    $(representation, ".copyCui").remove();
+    $(representation, ".searchCui").remove();
     $(representation, ".cui").textContent = "None";
     return [representation];
   } else {

@@ -169,19 +169,20 @@ summary::after {
   z-index: 999;
   margin: auto;
   display: flex;
-  position: absolute;
+  position: fixed;
   align-items: stretch;
   top: 0;
   bottom: 0;
   right: 0;
-  width: 23em;
-  transform: translateX(100%);
+  width: 25em;
+  transform: translateX(92%);
   transition: transform 0.1s ease-in-out; /* Smooth slide animation */
 }
 
 .innerDrawer {
   width: 100%;
   background-color: #fff;
+  padding: 0 1em;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
   overflow-y: scroll;
   overflow-x: hidden;
@@ -189,7 +190,7 @@ summary::after {
 
 .innerDrawer .flex {
   display: flex; /* Enable flexbox for layout */
-  padding: 0.5em;
+  padding: 1em;
   flex-direction: column; /* Arrange elements vertically */
   gap: 0.5em;
 }
@@ -243,17 +244,6 @@ summary::after {
   align-items: center;
   gap: 0.3em;
   margin-bottom: 0.5em;
-}
-
-#deleteTip {
-  position: absolute;
-  display: none;
-  padding: 0.5em;
-  color: #4b555c;
-  font-weight: bold;
-  border-radius: 0.5em;
-  background-color: cornsilk;
-  z-index: 999999;
 }
 
 /* CSS */
