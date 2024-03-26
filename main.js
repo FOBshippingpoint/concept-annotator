@@ -188,7 +188,7 @@ function insertAnnotationDoc(annotationDoc) {
     );
   });
   r.on("deleteAnnotation", async (annotation) => {
-    $(`.tag[data-id="${annotation.id}"]`).remove();
+    $(`.tag[data-annotation-id="${annotation.id}"]`).remove();
   });
   r.on("updateAnnotation", async (annotation, previous) => {
     $(`.tag[data-annotation-id="${annotation.id}"]`).textContent =
