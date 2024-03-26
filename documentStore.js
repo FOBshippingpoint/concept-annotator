@@ -36,6 +36,8 @@ export const documentStore = {
     return this.listId().includes(id);
   },
   delete(id) {
+    const newList = this.listId().filter((docId) => docId != id);
+    localStorage.setItem("documentList", JSON.stringify(newList));
     return localStorage.removeItem(id);
   },
 };

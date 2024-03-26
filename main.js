@@ -7,19 +7,22 @@ import { createAnnotationDoc, documentStore } from "./documentStore.js";
 
 const UMLS_BASE_URL = import.meta.env.VITE_UMLS_BASE_URL ?? "";
 
-function addTagForElement(el, textContent, documentId) {
+function adjustElementPosition(targetEl, referenceEl) {
+  const coords = getCoords(referenceEl);
+  targetEl.style.left = coords.left + coords.width / 2 + "px";
+  targetEl.style.top = coords.top + coords.height * 1.1 + "px";
+  targetEl.style.transform = "translateX(-50%)";
+}
+
+function addTagForElement(el, textContent, documentId, annotationId) {
   const tag = $$$("dfn");
   tag.dataset.documentId = documentId;
+  tag.dataset.annotationId = annotationId;
   tag.classList.add("tag");
   tag.textContent = textContent;
   document.body.appendChild(tag);
   tag.adjustTagPosition = () => {
-    queueMicrotask(() => {
-      const coords = getCoords(el);
-      tag.style.left = coords.left + coords.width / 2 + "px";
-      tag.style.top = coords.top + coords.height * 1.1 + "px";
-      tag.style.transform = "translateX(-50%)";
-    });
+    queueMicrotask(() => adjustElementPosition(tag, el));
   };
   tag.adjustTagPosition();
 }
@@ -53,14 +56,12 @@ dropzone.on("drop", (e) => {
       if (item.kind === "file") {
         const file = item.getAsFile();
         handleLoadFile(file);
-        console.log(`… file[${i}].name = ${file.name}`);
       }
     });
   } else {
     // Use DataTransfer interface to access the file(s)
     [...e.dataTransfer.files].forEach((file, i) => {
       handleLoadFile(file);
-      console.log(`… file[${i}].name = ${file.name}`);
     });
   }
 });
@@ -97,12 +98,14 @@ function handleLoadFile(file) {
           )
         ) {
           $(`.documentContainer[data-id="${annotationDoc.id}"]`).remove();
+          $$(`.tag[data-document-id="${annotationDoc.id}"]`).forEach((el) =>
+            el.remove(),
+          );
           documentStore.set(annotationDoc);
-          insertAnnotationDoc(annotationDoc);
         }
+        insertAnnotationDoc(annotationDoc);
       } catch (error) {
         // plain text
-        console.log("load", fileContent, "as plain text because", error);
         const annotationDoc = createAnnotationDoc({
           filename: file.name,
           text: fileContent,
@@ -165,6 +168,7 @@ function insertAnnotationDoc(annotationDoc) {
             el,
             annotationBodyToString(annotation.body),
             annotationDoc.id,
+            annotation.id,
           );
         }
       };
@@ -172,21 +176,24 @@ function insertAnnotationDoc(annotationDoc) {
     });
   }
 
+  r.on("selectAnnotation", async (annotation, element) => {
+    console.log(element);
+  });
   r.on("createAnnotation", async (annotation, overrideId) => {
     const el = $(`[data-id="${annotation.id}"]`);
     addTagForElement(
       el,
       annotationBodyToString(annotation.body),
       annotationDoc.id,
+      annotation.id,
     );
   });
   r.on("deleteAnnotation", async (annotation) => {
     $(`.tag[data-id="${annotation.id}"]`).remove();
   });
   r.on("updateAnnotation", async (annotation, previous) => {
-    $(`.tag[data-id="${annotation.id}"]`).textContent = annotationBodyToString(
-      annotation.body,
-    );
+    $(`.tag[data-annotation-id="${annotation.id}"]`).textContent =
+      annotationBodyToString(annotation.body);
   });
 
   saveBtn.on("click", () => {
@@ -265,17 +272,40 @@ async function saveFile(blob, suggestedName) {
 /** @param concept {Concept} */
 function insertConcept(concept) {
   const container = $("template.concept").content.cloneNode(true);
-  $(container, ".conceptHeader button").on("click", () => {
+  $(container, ".importCui").on("click", () => {
+    const tagInput = $(".r6o-autocomplete input");
+    if (tagInput) {
+      tagInput.value = concept.cui + "$";
+      tagInput.focus();
+      tagInput.setSelectionRange(concept.cui.length, concept.cui.length + 1);
+      $("#deleteTip").style.display = "inline";
+      adjustElementPosition($("#deleteTip"), tagInput);
+      const removeTip = (e) => {
+        if (e.key == "Enter") {
+          $("#deleteTip").style.display = "none";
+          tagInput.off("keydown", removeTip);
+        }
+      };
+      tagInput.on("keydown", removeTip);
+    }
+  });
+  $(container, ".copyCui").on("click", () => {
     try {
       navigator.clipboard.writeText(concept.cui);
     } catch (error) {
       console.error(error);
     }
   });
-  $(container, ".preferredName").textContent = concept.preferredName;
-  $(container, ".cui").textContent = concept.cui;
-  $(container, ".cui").href =
+
+  const representation = $("template.conceptRepresentation").content.cloneNode(
+    true,
+  );
+  $(representation, ".cui").textContent = concept.cui;
+  $(representation, ".cui").href =
     "https://uts.nlm.nih.gov/uts/umls/concept/" + concept.cui;
+  $(representation, ".preferredName").textContent = concept.preferredName;
+  $(container, '[name="conceptRepresentation"]').append(representation);
+
   $(container, ".synonyms").textContent =
     "Synonyms: " +
     [
@@ -305,14 +335,14 @@ function insertConcept(concept) {
 
 function insertChildConceptNodeList(concepts) {
   const result = concepts.map((c) => {
-    const child = $("template.childConcept").content.cloneNode(true);
+    const child = $("template.conceptRepresentation").content.cloneNode(true);
     $(child, ".cui").textContent = c.cui;
     $(child, ".cui").href = "https://uts.nlm.nih.gov/uts/umls/concept/" + c.cui;
     $(child, ".preferredName").textContent = c.preferredName;
     return child;
   });
   if (result.length == 0) {
-    const child = $("template.childConcept").content.cloneNode(true);
+    const child = $("template.conceptRepresentation").content.cloneNode(true);
     $(child, ".cui").textContent = "None";
     return [child];
   } else {
@@ -330,9 +360,10 @@ const updateConcepts = debounceTrailing(async () => {
   function showNoResult() {
     showMessage("找不到結果");
   }
-  const text = $(".conceptSearch input").value.trim();
+
+  const text = $("#searchBar").value.trim();
   const isCui = /^C\d{7}$/.test(text);
-  showMessage("搜尋中...")
+  showMessage("搜尋中...");
   try {
     let response;
     if (isCui) {
@@ -364,17 +395,14 @@ const updateConcepts = debounceTrailing(async () => {
   }
 });
 
-$(".conceptSearch input").on("input", updateConcepts);
-
 $$(".toggleConceptSearch").forEach((el) => {
-  console.log(el);
   el.on("click", (e) => {
     if (e.srcElement == el) {
       $(".drawer").classList.toggle("open");
       const isOpen = $("#toggleConceptSearchBtn").innerText == "＞"; // do not use textContent, because it would contains whitespace and linebreak
       if (!isOpen) {
         setTimeout(() => {
-          $(".conceptSearch input").select();
+          $("#searchBar").select();
         }, 100);
       }
       $("#toggleConceptSearchBtn").textContent = isOpen ? "＜" : "＞";
@@ -432,3 +460,25 @@ function getCoords(el) {
     height: box.height,
   };
 }
+
+// select text auto fill search bar.
+let isSearchOnSelection = $("#searchOnSelection").checked;
+const observer = new MutationObserver((mutationList, observer) => {
+  if (!isSearchOnSelection) return;
+
+  for (const mutationRecord of mutationList) {
+    const target = mutationRecord.target;
+    if (target.classList.contains("r6o-selection")) {
+      $("#searchBar").value = target.textContent;
+      $("#searchBar").dispatchEvent(new Event("search"));
+    }
+  }
+});
+observer.observe($("main"), { subtree: true, childList: true });
+
+$("#searchBar").on("search", updateConcepts);
+$("#searchBar").on("input", updateConcepts);
+
+$("#searchOnSelection").on("change", () => {
+  isSearchOnSelection = !isSearchOnSelection;
+});

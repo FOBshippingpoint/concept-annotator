@@ -27,3 +27,4 @@ export function $$$(tagName, options) {
 }
 
 EventTarget.prototype.on = EventTarget.prototype.addEventListener;
+EventTarget.prototype.off = EventTarget.prototype.removeEventListener;
