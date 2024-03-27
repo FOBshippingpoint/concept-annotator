@@ -366,7 +366,7 @@ const updateConcepts = debounceTrailing(async () => {
     showMessage("找不到結果");
   }
 
-  const text = $("#searchBar").value.trim();
+  const text = $("#searchBar").value.trim().toLowerCase();
   const isCui = /^C\d{7}$/.test(text);
   showMessage("搜尋中...");
   try {
@@ -486,10 +486,9 @@ observer.observe($("main"), { subtree: true, childList: true });
 
 function searchConcept(keyword) {
   $("#searchBar").value = keyword;
-  $("#searchBar").dispatchEvent(new Event("search"));
+  $("#searchBar").dispatchEvent(new InputEvent("input"));
 }
 
-$("#searchBar").on("search", updateConcepts);
 $("#searchBar").on("input", updateConcepts);
 
 $("#searchOnSelection").on("change", () => {
