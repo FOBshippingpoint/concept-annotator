@@ -21,6 +21,7 @@ export function $(el, selector) {
     }
   }
   result.$ = (selector) => $(el, selector);
+  result.$$ = (selector) => $$(el, selector);
   result.$_$ = (selectors) => {
     const map = {};
     for (const selector of selectors) {

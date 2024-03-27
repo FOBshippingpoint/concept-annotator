@@ -14,5 +14,15 @@ export function plug(el, slotName, children) {
 }
 
 export function cloneTemplate(selector) {
-  return $($("template" + selector).content.cloneNode(true));
+  const result = $($("template" + selector).content.cloneNode(true));
+  result.unbox = () => {
+    const map = {};
+    result.$$("[class]").forEach((el) => {
+      for (const c of el.classList) {
+        map[c] = el;
+      }
+    });
+    return map;
+  };
+  return result;
 }

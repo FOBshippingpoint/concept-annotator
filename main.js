@@ -6,6 +6,7 @@ import debounceTrailing from "./debounceTrailing.js";
 import { createAnnotationDoc, documentStore, bookmarkStore } from "./store.js";
 import { data } from "./data.js";
 import { cloneTemplate, plug } from "./templater.js";
+import { cache, isCached } from "./cache.js";
 
 const UMLS_BASE_URL = import.meta.env.VITE_UMLS_BASE_URL ?? "";
 
@@ -89,21 +90,8 @@ function insertAnnotationDoc(annotationDoc) {
   }
 
   const container = cloneTemplate(".documentContainer");
-  const {
-    ".documentContainer": documentContainer,
-    ".header": header,
-    ".content": content,
-    ".save": saveBtn,
-    ".export": exportBtn,
-    ".delete": deleteBtn,
-  } = container.$_$([
-    ".documentContainer",
-    ".header",
-    ".content",
-    ".save",
-    ".export",
-    ".delete",
-  ]);
+  const { documentContainer, header, content, saveBtn, exportBtn, deleteBtn } =
+    container.unbox();
 
   documentContainer.dataset.id = annotationDoc.id;
   header.textContent = "📝" + annotationDoc.filename;
@@ -170,7 +158,7 @@ function insertAnnotationDoc(annotationDoc) {
     if (confirm("確定要刪除嗎？")) {
       r.destroy();
       documentStore.delete(annotationDoc.id);
-      deleteBtn.closest(".documentContainer").remove();
+      documentContainer.remove();
       $$(`.tag[data-document-id="${annotationDoc.id}"]`).forEach((el) =>
         el.remove(),
       );
@@ -232,9 +220,9 @@ async function saveFile(blob, suggestedName) {
 function createConcept(concept) {
   const container = cloneTemplate(".concept");
   const representation = createConceptRepresentation(concept, [
-    "importCui",
-    "bookmarkCui",
-    "copyCui",
+    "importCuiBtn",
+    "bookmarkCuiBtn",
+    "copyCuiBtn",
   ]);
   plug(container, "conceptRepresentation", representation);
 
@@ -252,8 +240,9 @@ function createConcept(concept) {
   );
   for (const definition of concept.definitions) {
     const def = cloneTemplate(".definition");
-    $(def, ".meaning").innerHTML = definition.meaning ?? "";
-    $(def, ".sourceName").textContent = definition.sourceName;
+    const { meaning, sourceName } = def.unbox();
+    meaning.innerHTML = definition.meaning ?? "";
+    sourceName.textContent = definition.sourceName;
     plug(container, "definitions", def);
   }
   plug(
@@ -285,30 +274,23 @@ function createChildConceptNodeList(concepts) {
 function createConceptRepresentation(concept, buttons = []) {
   const container = cloneTemplate(".conceptRepresentation");
   const {
-    ".cui": cui,
-    ".preferredName": preferredName,
-    ".importCui": importCuiBtn,
-    ".bookmarkCui": bookmarkCuiBtn,
-    ".removeBookmark": removeBookmarkBtn,
-    ".copyCui": copyCuiBtn,
-    ".searchCui": searchCuiBtn,
-  } = container.$_$([
-    ".cui",
-    ".preferredName",
-    ".importCui",
-    ".bookmarkCui",
-    ".removeBookmark",
-    ".copyCui",
-    ".searchCui",
-  ]);
+    cui,
+    preferredName,
+    importCuiBtn,
+    bookmarkCuiBtn,
+    removeBookmarkBtn,
+    copyCuiBtn,
+    searchCuiBtn,
+    conceptRepresentation,
+  } = container.unbox();
   cui.textContent = concept.cui;
   cui.href = "https://uts.nlm.nih.gov/uts/umls/concept/" + concept.cui;
   preferredName.textContent = concept.preferredName;
 
   if (!Array.isArray(buttons) || buttons.length == 0) {
-    buttons = ["importCui", "bookmarkCui", "copyCui", "searchCui"];
+    buttons = ["importCuiBtn", "bookmarkCuiBtn", "copyCuiBtn", "searchCuiBtn"];
   }
-  if (buttons.includes("importCui")) {
+  if (buttons.includes("importCuiBtn")) {
     importCuiBtn.on("click", () => {
       const tagInput = $(".r6o-autocomplete input");
       if (tagInput) {
@@ -328,22 +310,22 @@ function createConceptRepresentation(concept, buttons = []) {
   } else {
     importCuiBtn.remove();
   }
-  if (buttons.includes("removeBookmark")) {
+  if (buttons.includes("removeBookmarkBtn")) {
     removeBookmarkBtn.on("click", () => {
       bookmarkStore.remove(concept);
-      removeBookmarkBtn.closest(".conceptRepresentation").remove();
+      conceptRepresentation.remove();
     });
   } else {
     removeBookmarkBtn.remove();
   }
-  if (buttons.includes("bookmarkCui")) {
+  if (buttons.includes("bookmarkCuiBtn")) {
     bookmarkCuiBtn.on("click", () => {
       insertConceptToBookmark(concept);
     });
   } else {
     bookmarkCuiBtn.remove();
   }
-  if (buttons.includes("copyCui")) {
+  if (buttons.includes("copyCuiBtn")) {
     copyCuiBtn.on("click", () => {
       try {
         navigator.clipboard.writeText(concept.cui);
@@ -354,7 +336,7 @@ function createConceptRepresentation(concept, buttons = []) {
   } else {
     copyCuiBtn.remove();
   }
-  if (buttons.includes("searchCui")) {
+  if (buttons.includes("searchCuiBtn")) {
     searchCuiBtn.on("click", () => {
       searchConcept(concept.cui);
     });
@@ -375,7 +357,7 @@ function showMessage(el, message) {
   el.append(msg);
 }
 const updateConcepts = debounceTrailing(async () => {
-  const slot = $('[name="concepts"]');
+  const slot = $('slot[name="concepts"]');
   function myShowMessage(message) {
     showMessage(slot, message);
   }
@@ -387,18 +369,27 @@ const updateConcepts = debounceTrailing(async () => {
   myShowMessage("搜尋中...");
   try {
     let response;
-    if (isCui(text)) {
-      response = await fetch(UMLS_BASE_URL + "/umls/concepts/" + text);
-    } else {
-      // plain text
-      response = await fetch(
-        UMLS_BASE_URL + "/umls/concepts?queryText=" + text.toLowerCase(),
-      );
+    if (!isCached(text)) {
+      if (isCui(text)) {
+        response = await fetch(UMLS_BASE_URL + "/umls/concepts/" + text);
+      } else {
+        // plain text
+        response = await fetch(
+          UMLS_BASE_URL + "/umls/concepts?queryText=" + text.toLowerCase(),
+        );
+      }
     }
-    if (response.status === "404") {
+    if (response?.status === "404") {
       showNoResult();
     } else {
-      const json = await response.json();
+      let json;
+      if (isCached(text)) {
+        json = cache[text];
+      } else {
+        json = await response.json();
+        cache[text] = json;
+      }
+
       if (json.status == "400" || json.data.length == 0) {
         showNoResult();
       } else {
@@ -469,9 +460,9 @@ function insertConceptToBookmark(concept, ignoreDuplicates = false) {
     return;
   }
   const representation = createConceptRepresentation(concept, [
-    "importCui",
-    "removeBookmark",
-    "searchCui",
+    "importCuiBtn",
+    "removeBookmarkBtn",
+    "searchCuiBtn",
   ]);
   const el = representation.$(".conceptRepresentation");
   el.on("selecttext", (e) => {
