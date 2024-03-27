@@ -3,8 +3,9 @@ import { Recogito } from "@recogito/recogito-js";
 import { $, $$, $$$ } from "./dollars.js";
 import "@recogito/recogito-js/dist/recogito.min.css";
 import debounceTrailing from "./debounceTrailing.js";
-import { createAnnotationDoc, documentStore } from "./documentStore.js";
+import { createAnnotationDoc, documentStore, bookmarkStore } from "./store.js";
 import { data } from "./data.js";
+import { cloneTemplate, plug } from "./templater.js";
 
 const UMLS_BASE_URL = import.meta.env.VITE_UMLS_BASE_URL ?? "";
 
@@ -27,56 +28,6 @@ function addTagForElement(el, textContent, documentId, annotationId) {
   };
   tag.adjustTagPosition();
 }
-
-window.on("resize", () => {
-  $$(".tag").forEach((tag) => tag.adjustTagPosition());
-});
-
-/** @type {HTMLDivElement} */
-const dropzone = $("#dropzone");
-/** @type {HTMLInputElement} */
-const fileInput = $("#uploadFile");
-
-// Handle drag and drop events
-dropzone.on("dragover", (event) => {
-  event.preventDefault(); // Prevent default browser behavior (open file)
-  dropzone.classList.add("dragover"); // Add visual cue for drag-over state
-});
-
-dropzone.on("dragleave", () => {
-  dropzone.classList.remove("dragover"); // Remove visual cue on drag-leave
-});
-
-dropzone.on("drop", (e) => {
-  e.preventDefault();
-  dropzone.classList.remove("dragover"); // Remove visual cue
-  if (e.dataTransfer.items) {
-    // Use DataTransferItemList interface to access the file(s)
-    [...e.dataTransfer.items].forEach((item, i) => {
-      // If dropped items aren't files, reject them
-      if (item.kind === "file") {
-        const file = item.getAsFile();
-        handleLoadFile(file);
-      }
-    });
-  } else {
-    // Use DataTransfer interface to access the file(s)
-    [...e.dataTransfer.files].forEach((file, i) => {
-      handleLoadFile(file);
-    });
-  }
-});
-
-// Handle click on dropzone to open file selection dialog
-dropzone.on("click", () => {
-  fileInput.click();
-});
-
-// Handle file selection from dialog
-fileInput.on("change", (event) => {
-  const selectedFile = event.target.files[0];
-  handleLoadFile(selectedFile);
-});
 
 /** @param file {File} */
 function handleLoadFile(file) {
@@ -137,21 +88,31 @@ function insertAnnotationDoc(annotationDoc) {
     });
   }
 
-  const container = $("template.documentContainer").content.cloneNode(true);
-  $(container, ".documentContainer").dataset.id = annotationDoc.id;
-  const header = $(container, ".header");
+  const container = cloneTemplate(".documentContainer");
+  const {
+    ".documentContainer": documentContainer,
+    ".header": header,
+    ".content": content,
+    ".save": saveBtn,
+    ".export": exportBtn,
+    ".delete": deleteBtn,
+  } = container.$_$([
+    ".documentContainer",
+    ".header",
+    ".content",
+    ".save",
+    ".export",
+    ".delete",
+  ]);
+
+  documentContainer.dataset.id = annotationDoc.id;
   header.textContent = "📝" + annotationDoc.filename;
-  const content = $(container, ".document");
   content.textContent = annotationDoc.text;
   content.on("scroll", () => {
     $$(content, ".tag").forEach((tag) => tag.adjustTagPosition());
   });
-  const saveBtn = $(container, ".save");
-  const exportBtn = $(container, ".export");
-  const deleteBtn = $(container, ".delete");
-
   // We need to append container into document first before initializing Recogito.
-  $('[name="documents"]').append(container);
+  plug("documents", container);
 
   const r = new Recogito({ content });
 
@@ -178,7 +139,6 @@ function insertAnnotationDoc(annotationDoc) {
   }
 
   r.on("createAnnotation", async (annotation, overrideId) => {
-    console.log("createAnnotation", annotation);
     const el = $(`[data-id="${annotation.id}"]`);
     addTagForElement(
       el,
@@ -270,34 +230,41 @@ async function saveFile(blob, suggestedName) {
 
 /** @param concept {Concept} */
 function createConcept(concept) {
-  const container = $("template.concept").content.cloneNode(true);
-  const representation = createConceptRepresentation(concept);
-  $(representation, ".searchCui").remove();
-  $(container, '[name="conceptRepresentation"]').append(representation);
+  const container = cloneTemplate(".concept");
+  const representation = createConceptRepresentation(concept, [
+    "importCui",
+    "bookmarkCui",
+    "copyCui",
+  ]);
+  plug(container, "conceptRepresentation", representation);
 
-  $(container, ".synonyms").textContent =
+  container.$(".synonyms").textContent =
     "Synonyms: " +
     [
       ...new Set([...concept.synonyms.map(({ term }) => term.toLowerCase())]),
     ].join(", ");
-  $(container, '[name="semanticTypes"]').append(
+  container.$('[name="semanticTypes"]').append(
     ...concept.semanticTypes.map((s) => {
-      const n = $("template.semanticType").content.cloneNode(true);
+      const n = cloneTemplate(".semanticType");
       n.textContent = s;
       return n;
     }),
   );
   for (const definition of concept.definitions) {
-    const def = $("template.definition").content.cloneNode(true);
+    const def = cloneTemplate(".definition");
     $(def, ".meaning").innerHTML = definition.meaning ?? "";
     $(def, ".sourceName").textContent = definition.sourceName;
-    $(container, '[name="definitions"]').appendChild(def);
+    plug(container, "definitions", def);
   }
-  $(container, '[name="broaderConcepts"]').append(
-    ...createChildConceptNodeList(concept.broaderConcepts),
+  plug(
+    container,
+    "broaderConcepts",
+    createChildConceptNodeList(concept.broaderConcepts),
   );
-  $(container, '[name="narrowerConcepts"]').append(
-    ...createChildConceptNodeList(concept.narrowerConcepts),
+  plug(
+    container,
+    "narrowerConcepts",
+    createChildConceptNodeList(concept.narrowerConcepts),
   );
   return container;
 }
@@ -305,78 +272,127 @@ function createConcept(concept) {
 function createChildConceptNodeList(concepts) {
   const result = concepts.map(createConceptRepresentation);
   if (result.length == 0) {
-    const representation = $(
-      "template.conceptRepresentation",
-    ).content.cloneNode(true);
-    $(representation, ".importCui").remove();
-    $(representation, ".copyCui").remove();
-    $(representation, ".searchCui").remove();
-    $(representation, ".cui").textContent = "None";
+    const representation = createConceptRepresentation(
+      { cui: "None", preferredName: "" },
+      [],
+    );
     return [representation];
   } else {
     return result;
   }
 }
 
-function createConceptRepresentation(concept) {
-  const container = $("template.conceptRepresentation").content.cloneNode(true);
-  $(container, ".cui").textContent = concept.cui;
-  $(container, ".cui").href =
-    "https://uts.nlm.nih.gov/uts/umls/concept/" + concept.cui;
-  $(container, ".preferredName").textContent = concept.preferredName;
+function createConceptRepresentation(concept, buttons = []) {
+  const container = cloneTemplate(".conceptRepresentation");
+  const {
+    ".cui": cui,
+    ".preferredName": preferredName,
+    ".importCui": importCuiBtn,
+    ".bookmarkCui": bookmarkCuiBtn,
+    ".removeBookmark": removeBookmarkBtn,
+    ".copyCui": copyCuiBtn,
+    ".searchCui": searchCuiBtn,
+  } = container.$_$([
+    ".cui",
+    ".preferredName",
+    ".importCui",
+    ".bookmarkCui",
+    ".removeBookmark",
+    ".copyCui",
+    ".searchCui",
+  ]);
+  cui.textContent = concept.cui;
+  cui.href = "https://uts.nlm.nih.gov/uts/umls/concept/" + concept.cui;
+  preferredName.textContent = concept.preferredName;
 
-  $(container, ".importCui").on("click", () => {
-    const tagInput = $(".r6o-autocomplete input");
-    if (tagInput) {
-      tagInput.value = concept.cui;
-      // 用input event騙react
-      tagInput.dispatchEvent(new InputEvent("input"));
-      // 緊接著用keydown Enter觸發將文字變成一個tag的指令
-      // 注意不能直接接在input event下面，我也不知道為什麼
-      // 只能用setTimeout不能用queueMicrotask，而且時間不能設成0，不然會變成註解兩次，原因不明
-      setTimeout(() => {
-        tagInput.dispatchEvent(new KeyboardEvent("keydown", { which: 13 }));
-      }, 1);
-    } else {
-      alert("請先選擇要匯入CUI標籤的文字");
-    }
-  });
-  $(container, ".copyCui").on("click", () => {
-    try {
-      navigator.clipboard.writeText(concept.cui);
-    } catch (error) {
-      console.error(error);
-    }
-  });
-  $(container, ".searchCui").on("click", () => {
-    searchConcept(concept.cui);
-  });
-
+  if (!Array.isArray(buttons) || buttons.length == 0) {
+    buttons = ["importCui", "bookmarkCui", "copyCui", "searchCui"];
+  }
+  if (buttons.includes("importCui")) {
+    importCuiBtn.on("click", () => {
+      const tagInput = $(".r6o-autocomplete input");
+      if (tagInput) {
+        tagInput.value = concept.cui;
+        // 用input event騙react
+        tagInput.dispatchEvent(new InputEvent("input"));
+        // 緊接著用keydown Enter觸發將文字變成一個tag的指令
+        // 注意不能直接接在input event下面，我也不知道為什麼
+        // 只能用setTimeout不能用queueMicrotask，而且時間不能設成0，不然會變成註解兩次，原因不明
+        setTimeout(() => {
+          tagInput.dispatchEvent(new KeyboardEvent("keydown", { which: 13 }));
+        }, 1);
+      } else {
+        alert("請先選擇要匯入CUI標籤的文字");
+      }
+    });
+  } else {
+    importCuiBtn.remove();
+  }
+  if (buttons.includes("removeBookmark")) {
+    removeBookmarkBtn.on("click", () => {
+      bookmarkStore.remove(concept);
+      removeBookmarkBtn.closest(".conceptRepresentation").remove();
+    });
+  } else {
+    removeBookmarkBtn.remove();
+  }
+  if (buttons.includes("bookmarkCui")) {
+    bookmarkCuiBtn.on("click", () => {
+      insertConceptToBookmark(concept);
+    });
+  } else {
+    bookmarkCuiBtn.remove();
+  }
+  if (buttons.includes("copyCui")) {
+    copyCuiBtn.on("click", () => {
+      try {
+        navigator.clipboard.writeText(concept.cui);
+      } catch (error) {
+        console.error(error);
+      }
+    });
+  } else {
+    copyCuiBtn.remove();
+  }
+  if (buttons.includes("searchCui")) {
+    searchCuiBtn.on("click", () => {
+      searchConcept(concept.cui);
+    });
+  } else {
+    searchCuiBtn.remove();
+  }
   return container;
 }
 
+function isCui(text) {
+  return /^C\d{7}$/.test(text);
+}
+
+function showMessage(el, message) {
+  el.innerHTML = "";
+  const msg = $$$("div");
+  msg.textContent = message;
+  el.append(msg);
+}
 const updateConcepts = debounceTrailing(async () => {
-  function showMessage(message) {
-    $('[name="concepts"]').innerHTML = "";
-    const msg = $$$("div");
-    msg.textContent = message;
-    $('[name="concepts"]').append(msg);
+  const slot = $('[name="concepts"]');
+  function myShowMessage(message) {
+    showMessage(slot, message);
   }
   function showNoResult() {
-    showMessage("找不到結果");
+    showMessage(slot, "找不到結果");
   }
 
-  const text = $("#searchBar").value.trim().toLowerCase();
-  const isCui = /^C\d{7}$/.test(text);
-  showMessage("搜尋中...");
+  const text = $("#searchBar").value.trim();
+  myShowMessage("搜尋中...");
   try {
     let response;
-    if (isCui) {
+    if (isCui(text)) {
       response = await fetch(UMLS_BASE_URL + "/umls/concepts/" + text);
     } else {
       // plain text
       response = await fetch(
-        UMLS_BASE_URL + "/umls/concepts?queryText=" + text,
+        UMLS_BASE_URL + "/umls/concepts?queryText=" + text.toLowerCase(),
       );
     }
     if (response.status === "404") {
@@ -386,38 +402,19 @@ const updateConcepts = debounceTrailing(async () => {
       if (json.status == "400" || json.data.length == 0) {
         showNoResult();
       } else {
-        $('[name="concepts"]').innerHTML = "";
+        slot.innerHTML = "";
         if (Array.isArray(json.data)) {
-          $('[name="concepts"]').append(...json.data.map(createConcept));
+          plug("concepts", json.data.map(createConcept));
         } else {
-          $('[name="concepts"]').append(createConcept(json.data));
+          plug("concepts", createConcept(json.data));
         }
       }
     }
   } catch (error) {
     console.error(error);
-    showMessage("發生錯誤");
+    myShowMessage("發生錯誤");
   }
 });
-
-$$(".toggleConceptSearch").forEach((el) => {
-  el.on("click", (e) => {
-    if (e.srcElement == el) {
-      $(".drawer").classList.toggle("open");
-      const isOpen = $("#toggleConceptSearchBtn").innerText == "＞"; // do not use textContent, because it would contains whitespace and linebreak
-      if (!isOpen) {
-        setTimeout(() => {
-          $("#searchBar").select();
-        }, 100);
-      }
-      $("#toggleConceptSearchBtn").textContent = isOpen ? "＜" : "＞";
-    }
-  });
-});
-
-for (const doc of documentStore.list()) {
-  insertAnnotationDoc(doc);
-}
 
 /** @typedef {object} Concept
  * @property {string} cui
@@ -466,35 +463,197 @@ function getCoords(el) {
   };
 }
 
-// select text auto fill search bar.
-let isSearchOnSelection = true;
-try {
-  isSearchOnSelection = JSON.parse(localStorage.getItem("isSearchOnSelection"));
-} catch (error) {}
-$("#searchOnSelection").checked = isSearchOnSelection;
-const observer = new MutationObserver((mutationList, observer) => {
-  if (!isSearchOnSelection) return;
-
-  for (const mutationRecord of mutationList) {
-    const target = mutationRecord.target;
-    if (target.classList.contains("r6o-selection")) {
-      searchConcept(target.textContent);
-    }
+function insertConceptToBookmark(concept, ignoreDuplicates = false) {
+  if (!ignoreDuplicates && bookmarkStore.has(concept)) {
+    alert("概念已經在書籤中");
+    return;
   }
-});
-observer.observe($("main"), { subtree: true, childList: true });
+  const representation = createConceptRepresentation(concept, [
+    "importCui",
+    "removeBookmark",
+    "searchCui",
+  ]);
+  const el = representation.$(".conceptRepresentation");
+  el.on("selecttext", (e) => {
+    let add = false;
+    const words = e.detail.text.toLowerCase().split(" ");
+    const terms = concept.preferredName
+      .toLowerCase()
+      .split(" ")
+      .concat(concept.synonyms.flatMap((s) => s.term.toLowerCase().split(" ")));
+
+    queueMicrotask(() => {
+      for (const t of terms) {
+        if (words.includes(t)) {
+          add = true;
+          break;
+        }
+      }
+      if (add) {
+        el.classList.add("highlight");
+      } else {
+        el.classList.remove("highlight");
+      }
+    });
+  });
+
+  plug("bookmarks", representation);
+  bookmarkStore.add(concept);
+}
 
 function searchConcept(keyword) {
   $("#searchBar").value = keyword;
   $("#searchBar").dispatchEvent(new InputEvent("input"));
 }
 
-$("#searchBar").on("input", updateConcepts);
+// 盤古開天
+function openUpHeavenAndEarth() {
+  // handle select text auto fill search bar.
+  let isSearchOnSelection = true;
+  try {
+    isSearchOnSelection = JSON.parse(
+      localStorage.getItem("isSearchOnSelection"),
+    );
+  } catch (error) {}
+  $("#searchOnSelection").checked = isSearchOnSelection;
+  // listen on document text selection
+  const observer = new MutationObserver((mutationList, observer) => {
+    if (!isSearchOnSelection) return;
 
-$("#searchOnSelection").on("change", () => {
-  isSearchOnSelection = !isSearchOnSelection;
-  localStorage.setItem("isSearchOnSelection", isSearchOnSelection.toString());
-});
+    for (const mutationRecord of mutationList) {
+      const target = mutationRecord.target;
+      if (target.classList.contains("r6o-selection")) {
+        $$(".conceptRepresentation").forEach((e) =>
+          e.dispatchEvent(
+            new CustomEvent("selecttext", {
+              detail: { text: target.textContent },
+            }),
+          ),
+        );
+        searchConcept(target.textContent);
+      }
+    }
+  });
+  observer.observe($("main"), { subtree: true, childList: true });
+
+  $("#searchOnSelection").on("change", () => {
+    isSearchOnSelection = !isSearchOnSelection;
+    localStorage.setItem("isSearchOnSelection", isSearchOnSelection.toString());
+  });
+
+  // handle search
+  $("#searchBar").on("input", updateConcepts);
+
+  // handle add bookmark
+  $("#addCuiBookmark").on("input", (e) => {
+    const text = e.target.value;
+    $(".addCuiBookmarkContainer button").disabled = !isCui(text);
+  });
+  $(".addCuiBookmarkContainer").on("submit", async (e) => {
+    e.preventDefault();
+    const formData = new FormData($(".addCuiBookmarkContainer"));
+    const text = formData.get("cui");
+    if (isCui(text)) {
+      function msg(msg) {
+        showMessage($(".bookmarkSearchStatus"), msg);
+      }
+      try {
+        msg("搜尋中...");
+        const response = await fetch(UMLS_BASE_URL + "/umls/concepts/" + text);
+        const json = await response.json();
+        const concept = json.data;
+        if (concept) {
+          insertConceptToBookmark(concept);
+          msg("　");
+        }
+      } catch (error) {
+        msg(`找不到概念"${text}"`);
+      }
+    }
+  });
+
+  // init annotation doc from localStorage
+  for (const doc of documentStore.getAll()) {
+    insertAnnotationDoc(doc);
+  }
+
+  // init bookmarks from localStorage
+  for (const concept of bookmarkStore.getAll()) {
+    insertConceptToBookmark(concept, true);
+  }
+
+  // handle toggle drawer
+  $$(".toggleDrawer").forEach((el) => {
+    el.on("click", (e) => {
+      if (e.srcElement == el) {
+        const drawer = $(
+          `.drawer[data-drawer-position="${el.dataset.drawerPosition}"]`,
+        );
+        drawer.classList.toggle("open");
+        const isOpen = $(drawer, "button.toggleDrawer").innerText == "＞"; // do not use textContent, because it would contains whitespace and linebreak
+        if (el.dataset.drawerPosition == "right" && !isOpen) {
+          setTimeout(() => {
+            $("#searchBar").select();
+          }, 100);
+        }
+        $(drawer, "button.toggleDrawer").textContent = isOpen ? "＜" : "＞";
+      }
+    });
+  });
+
+  // adjust tags position when window resize
+  window.on("resize", () => {
+    $$(".tag").forEach((tag) => tag.adjustTagPosition());
+  });
+
+  // handle file uploads
+  /** @type {HTMLDivElement} */
+  const dropzone = $("#dropzone");
+  /** @type {HTMLInputElement} */
+  const fileInput = $("#uploadFile");
+
+  // Handle drag and drop events
+  dropzone.on("dragover", (event) => {
+    event.preventDefault(); // Prevent default browser behavior (open file)
+    dropzone.classList.add("dragover"); // Add visual cue for drag-over state
+  });
+
+  dropzone.on("dragleave", () => {
+    dropzone.classList.remove("dragover"); // Remove visual cue on drag-leave
+  });
+
+  dropzone.on("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover"); // Remove visual cue
+    if (e.dataTransfer.items) {
+      // Use DataTransferItemList interface to access the file(s)
+      [...e.dataTransfer.items].forEach((item, i) => {
+        // If dropped items aren't files, reject them
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          handleLoadFile(file);
+        }
+      });
+    } else {
+      // Use DataTransfer interface to access the file(s)
+      [...e.dataTransfer.files].forEach((file, i) => {
+        handleLoadFile(file);
+      });
+    }
+  });
+
+  // Handle click on dropzone to open file selection dialog
+  dropzone.on("click", () => {
+    fileInput.click();
+  });
+
+  // Handle file selection from dialog
+  fileInput.on("change", (event) => {
+    const selectedFile = event.target.files[0];
+    handleLoadFile(selectedFile);
+  });
+}
+openUpHeavenAndEarth();
 
 function initData() {
   // init data

@@ -1,5 +1,5 @@
 export const documentStore = {
-  listId() {
+  getAllId() {
     const listStr = localStorage.getItem("documentList");
     let list = [];
     try {
@@ -11,14 +11,14 @@ export const documentStore = {
     localStorage.setItem("documentList", JSON.stringify(list));
     return list;
   },
-  list() {
-    return this.listId()
+  getAll() {
+    return this.getAllId()
       .map((id) => this.get(id))
       .filter((doc) => doc != null);
   },
   set(doc) {
     localStorage.setItem(doc.id, JSON.stringify(doc));
-    let list = this.listId();
+    let list = this.getAllId();
     const set = new Set(list);
     set.add(doc.id);
     list = Array.from(set);
@@ -33,12 +33,46 @@ export const documentStore = {
     }
   },
   has(id) {
-    return this.listId().includes(id);
+    return this.getAllId().includes(id);
   },
   delete(id) {
-    const newList = this.listId().filter((docId) => docId != id);
+    const newList = this.getAllId().filter((docId) => docId != id);
     localStorage.setItem("documentList", JSON.stringify(newList));
     return localStorage.removeItem(id);
+  },
+};
+
+export const bookmarkStore = {
+  getAll() {
+    let items = localStorage.getItem("bookmarks");
+    try {
+      items = JSON.parse(items);
+      if (!Array.isArray(items)) {
+        items = [];
+      }
+      return items;
+    } catch (error) {
+      localStorage.setItem("bookmarks", "[]");
+      items = [];
+    }
+    return items;
+  },
+  add(concept) {
+    let items = this.getAll();
+    if (!this.has(concept)) {
+      items.push(concept);
+      localStorage.setItem("bookmarks", JSON.stringify(items));
+    }
+  },
+  has(concept) {
+    return this.getAll().some(({ cui }) => cui == concept.cui);
+  },
+  remove(concept) {
+    let items = this.getAll().filter(({ cui }) => cui != concept.cui);
+    localStorage.setItem("bookmarks", JSON.stringify(items));
+  },
+  isEmpty() {
+    return this.getAll().length == 0;
   },
 };
 

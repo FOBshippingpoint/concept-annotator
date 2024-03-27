@@ -11,8 +11,47 @@
       <div id="dropzone">➕拖曳檔案到此處</div>
       <input type="file" id="uploadFile" />
     </main>
-    <aside class="drawer open">
-      <div class="innerDrawer toggleConceptSearch">
+    <aside class="drawer open" data-drawer-position="left">
+      <div class="innerDrawer toggleDrawer" data-drawer-position="left">
+        <div class="flex">
+          <h3>⭐概念書籤欄</h3>
+          <p class="none">
+            暫無書籤，搜尋概念後點選書籤<svg
+              style="top: 3px; position: relative"
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              fill="currentColor"
+              class="bi bi-bookmark"
+              viewBox="0 0 16 16"
+            >
+              <path
+                d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1z"
+              /></svg
+            >按鈕來加入
+          </p>
+          <form class="addCuiBookmarkContainer">
+            <input
+              id="addCuiBookmark"
+              name="cui"
+              placeholder="手動輸入CUI來加入書籤"
+            />
+            <button class="button" disabled type="submit">新增</button>
+          </form>
+          <div class="bookmarkSearchStatus">　</div>
+          <slot name="bookmarks"></slot>
+        </div>
+      </div>
+      <button
+        class="toggleDrawer"
+        data-drawer-position="left"
+        title="展開/收合面板"
+      >
+        ＜
+      </button>
+    </aside>
+    <aside class="drawer open" data-drawer-position="right">
+      <div class="innerDrawer toggleDrawer" data-drawer-position="right">
         <div class="flex">
           <div>
             <input id="searchBar" placeholder="搜尋UMLS概念" />
@@ -25,9 +64,9 @@
         </div>
       </div>
       <button
-        class="toggleConceptSearch"
-        id="toggleConceptSearchBtn"
-        title="展開/收合UMLS搜尋面板"
+        class="toggleDrawer"
+        data-drawer-position="right"
+        title="展開/收合面板"
       >
         ＞
       </button>
@@ -36,7 +75,7 @@
       <div class="documentContainer">
         <div class="header"></div>
         <hr />
-        <pre class="document"></pre>
+        <pre class="content"></pre>
         <hr />
         <button class="button export">匯出</button>
         <button class="button save">儲存</button>
@@ -72,7 +111,7 @@
       <div class="sourceName"></div>
       <div class="meaning"></div>
     </template>
-    <template class="semanticType"> </template>
+    <template class="semanticType"></template>
     <template class="conceptRepresentation">
       <div class="conceptRepresentation">
         <button class="importCui" title="填入CUI至當前標記窗格">
@@ -87,6 +126,37 @@
             <path
               fill-rule="evenodd"
               d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8m15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-5.904-2.854a.5.5 0 1 1 .707.708L6.707 9.95h2.768a.5.5 0 1 1 0 1H5.5a.5.5 0 0 1-.5-.5V6.475a.5.5 0 1 1 1 0v2.768z"
+            />
+          </svg>
+        </button>
+        <button class="removeBookmark" title="將CUI從書籤移除">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            fill="currentColor"
+            class="bi bi-trash"
+            viewBox="0 0 16 16"
+          >
+            <path
+              d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"
+            />
+            <path
+              d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"
+            />
+          </svg>
+        </button>
+        <button class="bookmarkCui" title="將CUI加入左側書籤欄">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            fill="currentColor"
+            class="bi bi-bookmark"
+            viewBox="0 0 16 16"
+          >
+            <path
+              d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1z"
             />
           </svg>
         </button>
