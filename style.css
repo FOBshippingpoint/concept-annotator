@@ -351,3 +351,12 @@ button.toggleDrawer:hover {
 .highlight a {
   color: inherit;
 }
+
+.tutorialBtn {
+  width: 100%;
+  text-align: center;
+}
+
+h4 {
+  margin: 0.8em 0;
+}

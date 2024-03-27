@@ -7,6 +7,8 @@ import { createAnnotationDoc, documentStore, bookmarkStore } from "./store.js";
 import { data } from "./data.js";
 import { cloneTemplate, plug } from "./templater.js";
 import { cache, isCached } from "./cache.js";
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
 
 const UMLS_BASE_URL = import.meta.env.VITE_UMLS_BASE_URL ?? "";
 
@@ -259,10 +261,20 @@ function createConcept(concept) {
 }
 
 function createChildConceptNodeList(concepts) {
-  const result = concepts.map(createConceptRepresentation);
+  const result = concepts.map((c) =>
+    createConceptRepresentation(c, [
+      "importCuiBtn",
+      "bookmarkCuiBtn",
+      "copyCuiBtn",
+      "searchCuiBtn",
+    ]),
+  );
   if (result.length == 0) {
     const representation = createConceptRepresentation(
-      { cui: "None", preferredName: "" },
+      {
+        cui: "None",
+        preferredName: "",
+      },
       [],
     );
     return [representation];
@@ -271,7 +283,7 @@ function createChildConceptNodeList(concepts) {
   }
 }
 
-function createConceptRepresentation(concept, buttons = []) {
+function createConceptRepresentation(concept, buttons) {
   const container = cloneTemplate(".conceptRepresentation");
   const {
     cui,
@@ -287,9 +299,6 @@ function createConceptRepresentation(concept, buttons = []) {
   cui.href = "https://uts.nlm.nih.gov/uts/umls/concept/" + concept.cui;
   preferredName.textContent = concept.preferredName;
 
-  if (!Array.isArray(buttons) || buttons.length == 0) {
-    buttons = ["importCuiBtn", "bookmarkCuiBtn", "copyCuiBtn", "searchCuiBtn"];
-  }
   if (buttons.includes("importCuiBtn")) {
     importCuiBtn.on("click", () => {
       const tagInput = $(".r6o-autocomplete input");
@@ -375,7 +384,9 @@ async function updateConcepts() {
       } else {
         // plain text
         response = await fetch(
-          UMLS_BASE_URL + "/umls/concepts?queryText=" + text.toLowerCase(),
+          UMLS_BASE_URL +
+            "/umls/concepts?" +
+            new URLSearchParams({ queryText: text.toLowerCase() }),
         );
       }
     }
@@ -469,10 +480,13 @@ function insertConceptToBookmark(concept, ignoreDuplicates = false) {
   el.on("selecttext", (e) => {
     let add = false;
     const words = e.detail.text.toLowerCase().split(" ");
-    const terms = concept.preferredName
-      .toLowerCase()
-      .split(" ")
-      .concat(concept.synonyms.flatMap((s) => s.term.toLowerCase().split(" ")));
+    let terms = concept.preferredName.toLowerCase().split(" ");
+
+    if (Array.isArray(concept.synonyms)) {
+      terms = terms.concat(
+        concept.synonyms.flatMap((s) => s.term.toLowerCase().split(" ")),
+      );
+    }
 
     queueMicrotask(() => {
       for (const t of terms) {
@@ -490,12 +504,26 @@ function insertConceptToBookmark(concept, ignoreDuplicates = false) {
   });
 
   plug("bookmarks", representation);
-  bookmarkStore.add(concept);
+  if (!ignoreDuplicates) {
+    bookmarkStore.add(concept);
+  }
 }
 
 function searchConcept(keyword) {
   $("#searchBar").value = keyword;
   $("#searchBar").dispatchEvent(new CustomEvent("search"));
+}
+
+function initFromLocalStorage() {
+  // init annotation doc from localStorage
+  for (const doc of documentStore.getAll()) {
+    insertAnnotationDoc(doc);
+  }
+
+  // init bookmarks from localStorage
+  for (const concept of bookmarkStore.getAll()) {
+    insertConceptToBookmark(concept, true);
+  }
 }
 
 // 盤古開天
@@ -564,16 +592,6 @@ function openUpHeavenAndEarth() {
       }
     }
   });
-
-  // init annotation doc from localStorage
-  for (const doc of documentStore.getAll()) {
-    insertAnnotationDoc(doc);
-  }
-
-  // init bookmarks from localStorage
-  for (const concept of bookmarkStore.getAll()) {
-    insertConceptToBookmark(concept, true);
-  }
 
   // handle toggle drawer
   $$(".toggleDrawer").forEach((el) => {
@@ -645,17 +663,178 @@ function openUpHeavenAndEarth() {
     const selectedFile = event.target.files[0];
     handleLoadFile(selectedFile);
   });
+
+  $(".tutorialBtn").on("click", startTutorial);
 }
 openUpHeavenAndEarth();
+initFromLocalStorage();
 
-function initData() {
-  // init data
-  $('[name="concepts"]').innerHTML = "";
-  if (Array.isArray(data.data)) {
-    $('[name="concepts"]').append(...data.data.map(createConcept));
-  } else {
-    $('[name="concepts"]').append(createConcept(json.data));
-  }
+let isHelpNeeded = localStorage.getItem("isHelpNeeded");
+if (isHelpNeeded == "false") {
+  isHelpNeeded = false;
+} else {
+  isHelpNeeded = true;
 }
 
-false && initData();
+if (isHelpNeeded) {
+  startTutorial();
+}
+function startTutorial() {
+  // init data
+  $$(".tag").forEach((el) => el.remove());
+  $('[name="concepts"]').innerHTML = "";
+  $('[name="concepts"]').append(createConcept(data.concept));
+
+  $('[name="bookmarks"]').innerHTML = "";
+  insertConceptToBookmark(data.concept, true);
+
+  $('[name="documents"]').innerHTML = "";
+  insertAnnotationDoc(data.annotationDoc);
+
+  const driverObj = driver({
+    showProgress: true,
+    animate: false,
+    showButtons: ["next", "previous", "close"],
+    steps: [
+      {
+        element: "#dropzone",
+        popover: {
+          description: "點擊此按鈕或拖曳檔案來上傳要標記的內容",
+        },
+      },
+      {
+        element: ".documentContainer",
+        popover: {
+          description: "標記文件範例",
+        },
+      },
+      {
+        element: ".documentContainer .content",
+        popover: {
+          description:
+            "主要標記區塊，用滑鼠點擊兩下可選擇一個字，點選並拖曳可標記任意範圍的文字",
+        },
+      },
+      {
+        element: ".documentContainer .r6o-annotation",
+        popover: {
+          description: "黃色代表有標記內容，下方的藍色文字為其標籤",
+          side: "top",
+        },
+      },
+      {
+        element: ".documentContainer .exportBtn",
+        popover: {
+          description:
+            "點擊此按鈕可將標記文件打包成json檔，供後續實驗分析，也可以日後再讀檔繼續標記",
+          side: "bottom",
+        },
+      },
+      {
+        element: ".documentContainer .saveBtn",
+        popover: {
+          description:
+            "點擊此按鈕可將本文件儲存於瀏覽器中，下次打開頁面資料也不會消失",
+          side: "bottom",
+        },
+      },
+      {
+        element: ".documentContainer .deleteBtn",
+        popover: {
+          description: "點擊此按鈕可將本文件刪除",
+          side: "bottom",
+        },
+      },
+      {
+        element: ".drawer[data-drawer-position='right']",
+        popover: {
+          description:
+            "UMLS搜尋面板，在此搜尋、瀏覽UMLS概念，點擊空白區塊可以展開/收合",
+        },
+      },
+      {
+        element: "#searchBar",
+        popover: {
+          description: "在這裡輸入關鍵字或CUI",
+        },
+      },
+      {
+        element: "#searchOnSelection",
+        popover: {
+          description:
+            "勾選此項時，在正中央的標記區塊選擇文字時就會自動帶入關鍵字搜尋概念",
+        },
+      },
+      {
+        element: ".concept .conceptRepresentation",
+        popover: {
+          description: "概念的Concept Unique Identifier（CUI）以及首選名稱（preferred name）",
+        },
+      },
+      {
+        element: ".concept .importCuiBtn",
+        popover: {
+          description:
+            "在正中央標記區塊選取要標記的文字範圍後，點擊此按鈕可自動填入CUI標籤",
+        },
+      },
+      {
+        element: ".concept .bookmarkCuiBtn",
+        popover: {
+          description:
+            "點擊此按鈕可將常常用到的概念加入左側的常用概念面板以重複使用",
+        },
+      },
+      {
+        element: ".concept .copyCuiBtn",
+        popover: {
+          description: "點擊此按鈕可將CUI複製到剪貼簿",
+        },
+      },
+      {
+        element: ".concept .cui",
+        popover: {
+          description: "在新分頁開啟UMLS官網的概念條目",
+        },
+      },
+      {
+        element: '.drawer[data-drawer-position="left"]',
+        popover: {
+          description: "概念書籤面板，點擊空白區域可以展開/收合",
+        },
+      },
+      {
+        element:
+          '.drawer[data-drawer-position="left"] .addCuiBookmarkContainer',
+        popover: {
+          description: "除了從右邊的UMLS面板加入常用概念以外，也可手動輸入",
+        },
+      },
+      {
+        element: '.drawer[data-drawer-position="left"] .conceptRepresentation',
+        popover: {
+          description: "當選取正中間標記區塊的文字時，和目標文字有關的概念會變成紅色",
+        },
+      },
+      {
+        element: '.drawer[data-drawer-position="left"] .removeBookmarkBtn',
+        popover: {
+          description: "點擊此按鈕可將概念從常用概念中移除",
+        },
+      },
+    ],
+    onDestroyed: () => {
+      $('[name="concepts"]').innerHTML = "";
+      $('[name="bookmarks"]').innerHTML = "";
+      $('[name="documents"]').innerHTML = "";
+      initFromLocalStorage();
+
+      isHelpNeeded = false;
+      localStorage.setItem("isHelpNeeded", isHelpNeeded.toString());
+    },
+    nextBtnText: "下一步",
+    prevBtnText: "上一步",
+    doneBtnText: "結束",
+  });
+  driverObj.drive();
+}

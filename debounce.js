@@ -1,3 +1,8 @@
+/**
+ * Create a debounced function that delays invoking `func`.
+ * See {@link https://css-tricks.com/debouncing-throttling-explained-examples/}
+ * for more information.
+ */
 export default function debounce(func, type = "trailing", timeout = 300) {
   let timer;
   return (...args) => {
