@@ -468,7 +468,7 @@ function getCoords(el) {
 
 function insertConceptToBookmark(concept, ignoreDuplicates = false) {
   if (!ignoreDuplicates && bookmarkStore.has(concept)) {
-    alert("概念已經在書籤中");
+    alert("概念已經在常用中");
     return;
   }
   const representation = createConceptRepresentation(concept, [
@@ -800,7 +800,7 @@ function startTutorial() {
       {
         element: '.drawer[data-drawer-position="left"]',
         popover: {
-          description: "概念書籤面板，點擊空白區域可以展開/收合",
+          description: "常用概念面板，點擊空白區域可以展開/收合",
         },
       },
       {
