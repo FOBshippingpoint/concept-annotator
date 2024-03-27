@@ -2,7 +2,7 @@ import "./style.css";
 import { Recogito } from "@recogito/recogito-js";
 import { $, $$, $$$ } from "./dollars.js";
 import "@recogito/recogito-js/dist/recogito.min.css";
-import debounceTrailing from "./debounceTrailing.js";
+import debounce from "./debounce.js";
 import { createAnnotationDoc, documentStore, bookmarkStore } from "./store.js";
 import { data } from "./data.js";
 import { cloneTemplate, plug } from "./templater.js";
@@ -356,7 +356,7 @@ function showMessage(el, message) {
   msg.textContent = message;
   el.append(msg);
 }
-const updateConcepts = debounceTrailing(async () => {
+async function updateConcepts() {
   const slot = $('slot[name="concepts"]');
   function myShowMessage(message) {
     showMessage(slot, message);
@@ -405,7 +405,8 @@ const updateConcepts = debounceTrailing(async () => {
     console.error(error);
     myShowMessage("發生錯誤");
   }
-});
+}
+const debouncedUpdateConcepts = debounce(updateConcepts);
 
 /** @typedef {object} Concept
  * @property {string} cui
@@ -494,7 +495,7 @@ function insertConceptToBookmark(concept, ignoreDuplicates = false) {
 
 function searchConcept(keyword) {
   $("#searchBar").value = keyword;
-  $("#searchBar").dispatchEvent(new InputEvent("input"));
+  $("#searchBar").dispatchEvent(new CustomEvent("search"));
 }
 
 // 盤古開天
@@ -514,6 +515,7 @@ function openUpHeavenAndEarth() {
     for (const mutationRecord of mutationList) {
       const target = mutationRecord.target;
       if (target.classList.contains("r6o-selection")) {
+        searchConcept(target.textContent);
         $$(".conceptRepresentation").forEach((e) =>
           e.dispatchEvent(
             new CustomEvent("selecttext", {
@@ -521,7 +523,6 @@ function openUpHeavenAndEarth() {
             }),
           ),
         );
-        searchConcept(target.textContent);
       }
     }
   });
@@ -533,7 +534,8 @@ function openUpHeavenAndEarth() {
   });
 
   // handle search
-  $("#searchBar").on("input", updateConcepts);
+  $("#searchBar").on("input", debouncedUpdateConcepts);
+  $("#searchBar").on("search", updateConcepts);
 
   // handle add bookmark
   $("#addCuiBookmark").on("input", (e) => {
