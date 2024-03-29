@@ -17,12 +17,10 @@ function recursiveFindTemplate(el, selector) {
 
 function packForChildTemplate(parentTemplate, childTemplate) {
   childTemplate = craft(childTemplate, false);
-  childTemplate.plug = (children) => {
-    if (typeof children[Symbol.iterator] == "function") {
-      childTemplate.replaceWith(...children);
-    } else {
-      childTemplate.replaceWith(children);
-    }
+  childTemplate.plug = (kids) => {
+    childTemplate.replaceWith(
+      ...(kids?.[Symbol.iterator] ? [...kids] : [kids]),
+    );
   };
   childTemplate.plugBy = (factory) =>
     childTemplate.plug(
@@ -45,13 +43,9 @@ function craft(template, clone) {
   template.$$("template").forEach((child) => {
     packForChildTemplate(template, child);
   });
-  template.fit = (children, slotName) => {
+  template.fit = (kids, slotName) => {
     const slot = template.$(`slot[name=${slotName}]`);
-    if (typeof children[Symbol.iterator] == "function") {
-      slot.append(...children);
-    } else {
-      slot.append(children);
-    }
+    slot.append(...(kids?.[Symbol.iterator] ? [...kids] : [kids]));
   };
   template.landing = (runway) => {
     $(`slot[name="${runway}"]`).append(template);
