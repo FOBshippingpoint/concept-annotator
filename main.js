@@ -17,7 +17,6 @@ import manualInputCuiUrl from "/manualInputCui.gif";
 import highlightOnSelectionUrl from "/highlightOnSelection.gif";
 import searchCuiBtnUrl from "/searchCuiBtn.gif";
 
-
 const UMLS_BASE_URL = import.meta.env.VITE_UMLS_BASE_URL ?? "";
 
 function adjustElementPosition(targetEl, referenceEl) {
@@ -830,7 +829,7 @@ function startTutorial() {
       $('[name="concepts"]').innerHTML = "";
       $('[name="bookmarks"]').innerHTML = "";
       $('[name="documents"]').innerHTML = "";
-      initFromLocalStorage();
+      $$(".tag").forEach((el) => el.remove());
 
       isHelpNeeded = false;
       localStorage.setItem("isHelpNeeded", isHelpNeeded.toString());
