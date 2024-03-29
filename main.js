@@ -3,12 +3,20 @@ import { Recogito } from "@recogito/recogito-js";
 import { $, $$, $$$ } from "./dollars.js";
 import "@recogito/recogito-js/dist/recogito.min.css";
 import debounce from "./debounce.js";
-import { createAnnotationDoc, documentStore, bookmarkStore } from "./store.js";
+import { documentStore, bookmarkStore, AnnotationDoc } from "./store.js";
 import { data } from "./data.js";
-import { cloneTemplate, plug } from "./templater.js";
+import { cloneTemplate } from "./templater.js";
 import { cache, isCached } from "./cache.js";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
+import triggerTagDialogUrl from "/triggerTagDialog.gif";
+import searchOnSelectionUrl from "/searchOnSelection.gif";
+import importCuiUrl from "/importCui.gif";
+import addToBookmarkUrl from "/addToBookmark.gif";
+import manualInputCuiUrl from "/manualInputCui.gif";
+import highlightOnSelectionUrl from "/highlightOnSelection.gif";
+import searchCuiBtnUrl from "/searchCuiBtn.gif";
+
 
 const UMLS_BASE_URL = import.meta.env.VITE_UMLS_BASE_URL ?? "";
 
@@ -61,12 +69,12 @@ function handleLoadFile(file) {
         insertAnnotationDoc(annotationDoc);
       } catch (error) {
         // plain text
-        const annotationDoc = createAnnotationDoc({
-          filename: file.name,
-          text: fileContent,
-          id: null,
-          annotations: null,
-        });
+        const annotationDoc = new AnnotationDoc(
+          null,
+          file.name,
+          fileContent,
+          null,
+        );
         insertAnnotationDoc(annotationDoc);
       }
     };
@@ -83,17 +91,17 @@ function handleLoadFile(file) {
 function insertAnnotationDoc(annotationDoc) {
   // is new doc?
   if (!annotationDoc.id) {
-    annotationDoc = createAnnotationDoc({
-      text: annotationDoc.text,
-      id: Date.now().toString(),
-      annotations: [],
-      filename: annotationDoc.filename,
-    });
+    annotationDoc = new AnnotationDoc(
+      Date.now().toString(),
+      annotationDoc.filename,
+      annotationDoc.text,
+      [],
+    );
   }
 
   const container = cloneTemplate(".documentContainer");
   const { documentContainer, header, content, saveBtn, exportBtn, deleteBtn } =
-    container.unbox();
+    container;
 
   documentContainer.dataset.id = annotationDoc.id;
   header.textContent = "📝" + annotationDoc.filename;
@@ -102,7 +110,7 @@ function insertAnnotationDoc(annotationDoc) {
     $$(content, ".tag").forEach((tag) => tag.adjustTagPosition());
   });
   // We need to append container into document first before initializing Recogito.
-  plug("documents", container);
+  container.landing("documents");
 
   const r = new Recogito({ content });
 
@@ -220,44 +228,40 @@ async function saveFile(blob, suggestedName) {
 
 /** @param concept {Concept} */
 function createConcept(concept) {
-  const container = cloneTemplate(".concept");
+  const t = cloneTemplate(".concept");
+  const { synonyms, $conceptRepresentation, $semanticType, $definition } = t;
+  synonyms.textContent =
+    "Synonyms: " +
+    [
+      ...new Set([...concept.synonyms.map(({ term }) => term.toLowerCase())]),
+    ].join(", ");
+  $semanticType.plugBy((clone) => {
+    return concept.semanticTypes.map((s) => {
+      const el = clone();
+      el.textContent = s;
+      return el;
+    });
+  });
   const representation = createConceptRepresentation(concept, [
     "importCuiBtn",
     "bookmarkCuiBtn",
     "copyCuiBtn",
   ]);
-  plug(container, "conceptRepresentation", representation);
-
-  container.$(".synonyms").textContent =
-    "Synonyms: " +
-    [
-      ...new Set([...concept.synonyms.map(({ term }) => term.toLowerCase())]),
-    ].join(", ");
-  container.$('[name="semanticTypes"]').append(
-    ...concept.semanticTypes.map((s) => {
-      const n = cloneTemplate(".semanticType");
-      n.textContent = s;
-      return n;
+  $conceptRepresentation.plug(representation);
+  $definition.plugBy((clone) =>
+    concept.definitions.map((definition) => {
+      const el = clone();
+      el.meaning.innerHTML = definition.meaning ?? "";
+      el.sourceName.textContent = definition.sourceName;
+      return el;
     }),
   );
-  for (const definition of concept.definitions) {
-    const def = cloneTemplate(".definition");
-    const { meaning, sourceName } = def.unbox();
-    meaning.innerHTML = definition.meaning ?? "";
-    sourceName.textContent = definition.sourceName;
-    plug(container, "definitions", def);
-  }
-  plug(
-    container,
-    "broaderConcepts",
-    createChildConceptNodeList(concept.broaderConcepts),
-  );
-  plug(
-    container,
-    "narrowerConcepts",
+  t.fit(createChildConceptNodeList(concept.broaderConcepts), "broaderConcepts");
+  t.fit(
     createChildConceptNodeList(concept.narrowerConcepts),
+    "narrowerConcepts",
   );
-  return container;
+  return t;
 }
 
 function createChildConceptNodeList(concepts) {
@@ -294,7 +298,7 @@ function createConceptRepresentation(concept, buttons) {
     copyCuiBtn,
     searchCuiBtn,
     conceptRepresentation,
-  } = container.unbox();
+  } = container;
   cui.textContent = concept.cui;
   cui.href = "https://uts.nlm.nih.gov/uts/umls/concept/" + concept.cui;
   preferredName.textContent = concept.preferredName;
@@ -406,9 +410,9 @@ async function updateConcepts() {
       } else {
         slot.innerHTML = "";
         if (Array.isArray(json.data)) {
-          plug("concepts", json.data.map(createConcept));
+          json.data.forEach((c) => createConcept(c).landing("concepts"));
         } else {
-          plug("concepts", createConcept(json.data));
+          createConcept(json.data).landing("concepts");
         }
       }
     }
@@ -476,8 +480,8 @@ function insertConceptToBookmark(concept, ignoreDuplicates = false) {
     "removeBookmarkBtn",
     "searchCuiBtn",
   ]);
-  const el = representation.$(".conceptRepresentation");
-  el.on("selecttext", (e) => {
+  const { conceptRepresentation } = representation;
+  conceptRepresentation.on("selecttext", (e) => {
     let add = false;
     const words = e.detail.text.toLowerCase().split(" ");
     let terms = concept.preferredName.toLowerCase().split(" ");
@@ -496,14 +500,13 @@ function insertConceptToBookmark(concept, ignoreDuplicates = false) {
         }
       }
       if (add) {
-        el.classList.add("highlight");
+        conceptRepresentation.classList.add("highlight");
       } else {
-        el.classList.remove("highlight");
+        conceptRepresentation.classList.remove("highlight");
       }
     });
   });
-
-  plug("bookmarks", representation);
+  representation.landing("bookmarks");
   if (!ignoreDuplicates) {
     bookmarkStore.add(concept);
   }
@@ -695,61 +698,58 @@ function startTutorial() {
     showProgress: true,
     animate: false,
     showButtons: ["next", "previous", "close"],
+    popoverClass: "myDriverTheme",
     steps: [
       {
         element: "#dropzone",
         popover: {
-          description: "點擊此按鈕或拖曳檔案來上傳要標記的內容",
+          description: "點擊或拖曳上傳標記文件",
         },
       },
       {
         element: ".documentContainer",
         popover: {
-          description: "標記文件範例",
+          description: "標記文件區塊",
         },
       },
       {
         element: ".documentContainer .content",
         popover: {
-          description:
-            "主要標記區塊，用滑鼠點擊兩下可選擇一個字，點選並拖曳可標記任意範圍的文字",
+          description: `<img alt="標記方法" src="${triggerTagDialogUrl}" width="487px" height="213px"></img><div>點擊兩下選擇一個字<br/>點選並拖曳可標記任意範圍的文字</div>`,
         },
       },
       {
         element: ".documentContainer .r6o-annotation",
         popover: {
-          description: "黃色代表有標記內容，下方的藍色文字為其標籤",
-          side: "top",
+          description:
+            '<span class="r6o-annotation">黃色</span>：標記內容<br/><span style="color:#4485ea">藍色文字</span>：所屬標籤',
         },
       },
       {
         element: ".documentContainer .exportBtn",
         popover: {
-          description:
-            "點擊此按鈕可將標記文件打包成json檔，供後續實驗分析，也可以日後再讀檔繼續標記",
+          description: "標記結果另存新檔",
           side: "bottom",
         },
       },
       {
         element: ".documentContainer .saveBtn",
         popover: {
-          description:
-            "點擊此按鈕可將本文件儲存於瀏覽器中，下次打開頁面資料也不會消失",
+          description: "暫存文件避免頁面關掉後遺失資料",
           side: "bottom",
         },
       },
       {
         element: ".documentContainer .deleteBtn",
         popover: {
-          description: "點擊此按鈕可將本文件刪除",
+          description: "刪除文件",
           side: "bottom",
         },
       },
       {
         element: ".drawer[data-drawer-position='right']",
         popover: {
-          description:
-            "UMLS搜尋面板，在此搜尋、瀏覽UMLS概念，點擊空白區塊可以展開/收合",
+          description: "UMLS搜尋面板",
         },
       },
       {
@@ -759,67 +759,70 @@ function startTutorial() {
         },
       },
       {
-        element: "#searchOnSelection",
+        element: "#searchOnSelectionContainer",
         popover: {
-          description:
-            "勾選此項時，在正中央的標記區塊選擇文字時就會自動帶入關鍵字搜尋概念",
+          description: `<img alt="勾選與未勾選的差異" src="${searchOnSelectionUrl}" width="728px"></img><div>勾選此項時，在正中央的標記區塊選擇文字時就會自動帶入關鍵字搜尋概念</div>`,
         },
       },
       {
         element: ".concept .conceptRepresentation",
         popover: {
-          description: "概念的Concept Unique Identifier（CUI）以及首選名稱（preferred name）",
+          description: "Concept Unique Identifier（CUI）及preferred name",
         },
       },
       {
         element: ".concept .importCuiBtn",
         popover: {
-          description:
-            "在正中央標記區塊選取要標記的文字範圍後，點擊此按鈕可自動填入CUI標籤",
+          description: `<img alt="匯入CUI" src="${importCuiUrl}" width="727px"></img><div>選取要標記的文字後，點擊按鈕自動填入CUI標籤</div>`,
         },
       },
       {
         element: ".concept .bookmarkCuiBtn",
         popover: {
-          description:
-            "點擊此按鈕可將常常用到的概念加入左側的常用概念面板以重複使用",
+          description: `<img alt="加入常用CUI" src="${addToBookmarkUrl}" width="728px"></img><div>加入到常用概念</div>`,
         },
       },
       {
         element: ".concept .copyCuiBtn",
         popover: {
-          description: "點擊此按鈕可將CUI複製到剪貼簿",
+          description: "複製CUI到剪貼簿",
         },
       },
       {
         element: ".concept .cui",
         popover: {
-          description: "在新分頁開啟UMLS官網的概念條目",
+          description: "新分頁開啟UMLS概念條目",
         },
       },
       {
         element: '.drawer[data-drawer-position="left"]',
         popover: {
-          description: "常用概念面板，點擊空白區域可以展開/收合",
+          description: "常用概念面板",
         },
       },
       {
         element:
           '.drawer[data-drawer-position="left"] .addCuiBookmarkContainer',
         popover: {
-          description: "除了從右邊的UMLS面板加入常用概念以外，也可手動輸入",
+          description: `<img alt="輸入CUI加入常用概念" src="${manualInputCuiUrl}" width="359px"></img><div>輸入CUI加入常用概念</div>`,
         },
       },
       {
         element: '.drawer[data-drawer-position="left"] .conceptRepresentation',
         popover: {
-          description: "當選取正中間標記區塊的文字時，和目標文字有關的概念會變成紅色",
+          description: `<img alt="選取文字，相關概念變紅色" src="${highlightOnSelectionUrl}" width="806px"></img><div>當選取文字時，有關的概念會變成紅色</div>`,
         },
       },
       {
         element: '.drawer[data-drawer-position="left"] .removeBookmarkBtn',
         popover: {
-          description: "點擊此按鈕可將概念從常用概念中移除",
+          description: "從常用概念中移除",
+        },
+      },
+      {
+        element: '.drawer[data-drawer-position="left"] .searchCuiBtn',
+        popover: {
+          description: `<img alt="搜尋概念" src="${searchCuiBtnUrl}" width="740px"></img><div>搜尋概念</div>`,
         },
       },
     ],

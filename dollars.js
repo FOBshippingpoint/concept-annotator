@@ -5,6 +5,30 @@
  * It offers functions for selecting elements, creating new elements, and attaching event listeners.
  */
 
+function single1(selector) {
+  return document.querySelector(selector);
+}
+
+function single2(element, selector) {
+  return element.querySelector(selector);
+}
+
+function multiple1(selector) {
+  return [...document.querySelectorAll(selector)].map(wrap);
+}
+
+function multiple2(element, selector) {
+  return [...element.querySelectorAll(selector)].map(wrap);
+}
+
+function wrap(element) {
+  if (element) {
+    element.$ = (selector) => single2(element, selector);
+    element.$$ = (selector) => multiple2(element, selector);
+    return element;
+  }
+}
+
 /**
  * Selects a single element from the DOM.
  *
@@ -12,47 +36,16 @@
  * @param {string} [selector] - Optional selector string if `el` is an element.
  * @returns {HTMLElement|null} The selected element or null if not found.
  */
-export function $(el, selector) {
-  let result;
-
-  // If `el` is already an element and no selector is provided
-  if (typeof el === "object" && selector === undefined) {
-    result = el;
-  }
-  // If `el` is a CSS selector string and no selector is provided
-  else if (typeof el === "string" && selector === undefined) {
-    selector = el;
-    el = document;
-    result = el.querySelector(selector);
-    if (!result) {
-      return null;
+export function $(...args) {
+  if (args.length == 1) {
+    if (typeof args[0] == "string") {
+      return wrap(single1(...args));
+    } else {
+      return wrap(...args);
     }
+  } else if (args.length == 2) {
+    return wrap(single2(...args));
   }
-  // If both `el` and selector are provided
-  else {
-    result = el.querySelector(selector);
-    if (!result) {
-      return null;
-    }
-  }
-
-  /**
-   * Chains another `$` call within the current context.
-   *
-   * @param {string} selector - The selector string for the nested element.
-   * @returns {HTMLElement|null} The selected element within the current context.
-   */
-  result.$ = (childSelector) => $(result, childSelector);
-
-  /**
-   * Selects multiple elements as an array using `querySelectorAll`.
-   *
-   * @param {string} selector - The selector string for the elements to select.
-   * @returns {HTMLElement[]} An array of the selected elements.
-   */
-  result.$$ = (childSelector) => $$(result, childSelector);
-
-  return result;
 }
 
 /**
@@ -62,13 +55,12 @@ export function $(el, selector) {
  * @param {string} selector - The selector string for the elements to select.
  * @returns {HTMLElement[]} An array of the selected elements.
  */
-export function $$(el, selector) {
-  if (typeof el === "string") {
-    selector = el;
-    el = document;
+export function $$(...args) {
+  if (args.length == 1 && typeof args[0] == "string") {
+    return multiple1(...args);
+  } else if (args.length == 2) {
+    return multiple2(...args);
   }
-
-  return [...el.querySelectorAll(selector)];
 }
 
 /**

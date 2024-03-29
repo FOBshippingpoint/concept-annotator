@@ -97,3 +97,10 @@ export function createAnnotationDoc({ id, filename, text, annotations }) {
     annotations,
   };
 }
+
+export function AnnotationDoc(id, filename, text, annotations) {
+  this.id = id;
+  this.filename = filename;
+  this.text = text;
+  this.annotations = annotations;
+}

@@ -360,3 +360,7 @@ button.toggleDrawer:hover {
 h4 {
   margin: 0.8em 0;
 }
+
+.driver-popover.myDriverTheme:has(img) {
+  max-width: unset;
+}
