@@ -10,27 +10,6 @@
   opacity: 1;
 }
 
-#dropzone {
-  height: 150px; /* Adjust height as needed */
-  border: 2px dashed #ccc; /* Optional dashed border */
-  border-radius: 5px; /* Rounded corners */
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer; /* Indicate clickable area */
-  margin: 10px auto; /* Optional margin for centering */
-  background: #f2f2f2; /* Light gray background */
-  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.1); /* Subtle inner shadow */
-}
-
-#dropzone.dragover {
-  background: #e6e6e6; /* Slightly darker background on drag-over */
-  box-shadow: inset 0 0 0 4px rgba(0, 0, 0, 0.2); /* More prominent inner shadow */
-}
-
-#uploadFile {
-  display: none;
-}
 
 .documentContainer {
   padding: 1rem 1.4rem;

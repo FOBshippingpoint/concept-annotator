@@ -2,31 +2,54 @@
  * @module dollars
  *
  * This module provides a simplified, jQuery-like syntax for DOM manipulation.
- * It offers functions for selecting elements, creating new elements, and attaching event listeners.
+ * It offers functions for selecting elements, creating new elements, and
+ * attaching event listeners.
  */
 
+/**
+ * Alias for Document.querySelector
+ */
 function single1(selector) {
   return document.querySelector(selector);
 }
 
+/**
+ * Alias for HTMLElement.querySelector
+ */
 function single2(element, selector) {
   return element.querySelector(selector);
 }
 
+/**
+ * Alias for Document.querySelectorAll
+ * @returns {HTMLElement[]}
+ */
 function multiple1(selector) {
   return [...document.querySelectorAll(selector)].map(wrap);
 }
 
+/**
+ * Alias for HTMLElement.querySelectorAll
+ * @returns {HTMLElement[]}
+ */
 function multiple2(element, selector) {
   return [...element.querySelectorAll(selector)].map(wrap);
 }
 
+
+/**
+ * Add $ and $$ for selecting element(s) in this element's scope.
+ * @param {HTMLElement} element
+ */
 function wrap(element) {
   if (element) {
-    element.$ = (selector) => single2(element, selector);
-    element.$$ = (selector) => multiple2(element, selector);
-    return element;
+    Object.assign(element, {
+      $: (selector) => single2(element, selector),
+      $$: (selector) => multiple2(element, selector),
+    });
   }
+
+  return element;
 }
 
 /**
@@ -65,13 +88,9 @@ export function $$(...args) {
 
 /**
  * Creates a new HTML element with the specified tag name and optional attributes.
- *
- * @param {string} tagName - The tag name of the element to create (e.g., "div", "span", "p").
- * @param {Object} [options] - Optional object containing attributes for the element.
- * @returns {HTMLElement} The newly created element.
  */
-export function $$$(tagName, options = {}) {
-  return document.createElement(tagName, options);
+export function $$$(...args) {
+  return document.createElement(...args);
 }
 
 EventTarget.prototype.on = EventTarget.prototype.addEventListener;

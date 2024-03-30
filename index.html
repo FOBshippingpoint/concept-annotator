@@ -8,8 +8,7 @@
   <body class="drawerContainer">
     <main>
       <slot name="documents"></slot>
-      <div id="dropzone">➕拖曳檔案到此處</div>
-      <input type="file" id="uploadFile" />
+      <file-dropzone></file-dropzone>
       <div class="button tutorialBtn">❓使用導覽</div>
     </main>
     <aside class="drawer open" data-drawer-position="left">
@@ -181,13 +180,7 @@
         </details>
       </div>
     </template>
-    <template class="a">
-      <template class="b">
-        <template class="c">
-          <template class="d"> </template>
-        </template>
-      </template>
-    </template>
+    <script type="module" src="/FileDropzoneElement.js"></script>
     <script type="module" src="/main.js"></script>
   </body>
 </html>

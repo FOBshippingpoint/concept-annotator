@@ -619,54 +619,9 @@ function openUpHeavenAndEarth() {
     $$(".tag").forEach((tag) => tag.adjustTagPosition());
   });
 
-  // handle file uploads
-  /** @type {HTMLDivElement} */
-  const dropzone = $("#dropzone");
-  /** @type {HTMLInputElement} */
-  const fileInput = $("#uploadFile");
-
-  // Handle drag and drop events
-  dropzone.on("dragover", (event) => {
-    event.preventDefault(); // Prevent default browser behavior (open file)
-    dropzone.classList.add("dragover"); // Add visual cue for drag-over state
-  });
-
-  dropzone.on("dragleave", () => {
-    dropzone.classList.remove("dragover"); // Remove visual cue on drag-leave
-  });
-
-  dropzone.on("drop", (e) => {
-    e.preventDefault();
-    dropzone.classList.remove("dragover"); // Remove visual cue
-    if (e.dataTransfer.items) {
-      // Use DataTransferItemList interface to access the file(s)
-      [...e.dataTransfer.items].forEach((item, i) => {
-        // If dropped items aren't files, reject them
-        if (item.kind === "file") {
-          const file = item.getAsFile();
-          handleLoadFile(file);
-        }
-      });
-    } else {
-      // Use DataTransfer interface to access the file(s)
-      [...e.dataTransfer.files].forEach((file, i) => {
-        handleLoadFile(file);
-      });
-    }
-  });
-
-  // Handle click on dropzone to open file selection dialog
-  dropzone.on("click", () => {
-    fileInput.click();
-  });
-
-  // Handle file selection from dialog
-  fileInput.on("change", (event) => {
-    const selectedFile = event.target.files[0];
-    handleLoadFile(selectedFile);
-  });
-
   $(".tutorialBtn").on("click", startTutorial);
+
+  $("file-dropzone").handleLoadFile = handleLoadFile;
 }
 openUpHeavenAndEarth();
 initFromLocalStorage();
@@ -685,7 +640,7 @@ function startTutorial() {
   // init data
   $$(".tag").forEach((el) => el.remove());
   $('[name="concepts"]').innerHTML = "";
-  $('[name="concepts"]').append(createConcept(data.concept));
+  createConcept(data.concept).landing("concepts")
 
   $('[name="bookmarks"]').innerHTML = "";
   insertConceptToBookmark(data.concept, true);
@@ -700,7 +655,7 @@ function startTutorial() {
     popoverClass: "myDriverTheme",
     steps: [
       {
-        element: "#dropzone",
+        element: "file-dropzone",
         popover: {
           description: "點擊或拖曳上傳標記文件",
         },
