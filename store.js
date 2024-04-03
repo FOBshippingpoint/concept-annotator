@@ -86,18 +86,8 @@ export const bookmarkStore = {
  */
 
 /**
- * @param {AnnotationDoc} args
  * @returns {AnnotationDoc}
  */
-export function createAnnotationDoc({ id, filename, text, annotations }) {
-  return {
-    id,
-    filename,
-    text,
-    annotations,
-  };
-}
-
 export function AnnotationDoc(id, filename, text, annotations) {
   this.id = id;
   this.filename = filename;
