@@ -12,13 +12,13 @@
 
 
 .documentContainer {
-  padding: 1rem 1.4rem;
+  padding: 0 1.4rem;
   border: 1px solid #222;
   border-radius: 4px;
 }
 
 .documentContainer + .documentContainer {
-  margin-top: 10px;
+  margin-top: 1em
 }
 
 .content {
@@ -153,7 +153,7 @@ summary::after {
   top: 0;
   bottom: 0;
   right: 0;
-  width: 25em;
+  width: 20em;
   transform: translateX(92%);
   transition: transform 0.1s ease-in-out; /* Smooth slide animation */
 }
@@ -239,6 +239,23 @@ button.toggleDrawer:hover {
   flex-direction: column;
   flex: 1 1 auto;
   gap: 0.5em;
+}
+
+.documentContainer .header {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  background-color: white;
+  z-index: 99;
+  padding: 1em 0;
+}
+
+.documentContainer .footer {
+  position: sticky;
+  bottom: 0;
+  background-color: white;
+  z-index: 99;
+  padding: 1em 0;
 }
 
 .conceptHeader {
@@ -329,11 +346,6 @@ button.toggleDrawer:hover {
 
 .highlight a {
   color: inherit;
-}
-
-.tutorialBtn {
-  width: 100%;
-  text-align: center;
 }
 
 h4 {

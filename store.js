@@ -40,6 +40,10 @@ export const documentStore = {
     localStorage.setItem("documentList", JSON.stringify(newList));
     return localStorage.removeItem(id);
   },
+  deleteAll() {
+    const ids = this.getAllId();
+    ids.forEach((id) => this.delete(id));
+  },
 };
 
 export const bookmarkStore = {
@@ -73,6 +77,9 @@ export const bookmarkStore = {
   },
   isEmpty() {
     return this.getAll().length == 0;
+  },
+  deleteAll() {
+    localStorage.setItem("bookmarks", "[]");
   },
 };
 

@@ -9,6 +9,9 @@
     <main>
       <slot name="documents"></slot>
       <file-dropzone></file-dropzone>
+      <button class="button importPackBtn">🗃️重置並匯入</button>
+      <input class="importPackFile" type="file" hidden />
+      <div class="button resetWorkspaceBtn">🗑️重置工作區</div>
       <div class="button tutorialBtn">❓使用導覽</div>
     </main>
     <aside class="drawer open" data-drawer-position="left">
@@ -65,9 +68,11 @@
         <hr />
         <pre class="content"></pre>
         <hr />
-        <button class="button exportBtn">匯出</button>
-        <button class="button saveBtn">儲存</button>
-        <button class="button deleteBtn">刪除</button>
+        <div class="footer">
+          <button class="button exportBtn">匯出</button>
+          <button class="button saveBtn">儲存</button>
+          <button class="button deleteBtn">刪除</button>
+        </div>
       </div>
     </template>
     <template class="concept">

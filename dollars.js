@@ -36,7 +36,6 @@ function multiple2(element, selector) {
   return [...element.querySelectorAll(selector)].map(wrap);
 }
 
-
 /**
  * Add $ and $$ for selecting element(s) in this element's scope.
  * @param {HTMLElement} element
@@ -79,11 +78,15 @@ export function $(...args) {
  * @returns {HTMLElement[]} An array of the selected elements.
  */
 export function $$(...args) {
+  let arr;
   if (args.length == 1 && typeof args[0] == "string") {
-    return multiple1(...args);
+    arr = multiple1(...args);
   } else if (args.length == 2) {
-    return multiple2(...args);
+    arr = multiple2(...args);
   }
+  arr.do = (func) => arr.forEach(func);
+  arr.kill = () => arr.forEach((el) => el.remove());
+  return arr;
 }
 
 /**

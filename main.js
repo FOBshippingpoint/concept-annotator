@@ -4,84 +4,37 @@ import { $, $$, $$$ } from "./dollars.js";
 import "@recogito/recogito-js/dist/recogito.min.css";
 import debounce from "./debounce.js";
 import { documentStore, bookmarkStore, AnnotationDoc } from "./store.js";
-import { data } from "./data.js";
 import { cloneTemplate } from "./templater.js";
 import { cache, isCached } from "./cache.js";
-import { driver } from "driver.js";
-import "driver.js/dist/driver.css";
-import triggerTagDialogUrl from "/triggerTagDialog.gif";
-import searchOnSelectionUrl from "/searchOnSelection.gif";
-import importCuiUrl from "/importCui.gif";
-import addToBookmarkUrl from "/addToBookmark.gif";
-import manualInputCuiUrl from "/manualInputCui.gif";
-import highlightOnSelectionUrl from "/highlightOnSelection.gif";
-import searchCuiBtnUrl from "/searchCuiBtn.gif";
+import { addTagForElement } from "./tag.js";
+import { shouldStartTutorial, startTutorial } from "./driver.js";
+import { data } from "./data.js";
 
 const UMLS_BASE_URL = import.meta.env.VITE_UMLS_BASE_URL ?? "";
 
-function adjustElementPosition(targetEl, referenceEl) {
-  const coords = getCoords(referenceEl);
-  targetEl.style.left = coords.left + coords.width / 2 + "px";
-  targetEl.style.top = coords.top + coords.height * 1.1 + "px";
-  targetEl.style.transform = "translateX(-50%)";
-}
+/**
+ * @param callback {Function}
+ */
+function createHandleLoadFile(callback) {
+  return (file) => {
+    if (file) {
+      const reader = new FileReader();
 
-function addTagForElement(el, textContent, documentId, annotationId) {
-  const tag = $$$("dfn");
-  tag.dataset.documentId = documentId;
-  tag.dataset.annotationId = annotationId;
-  tag.classList.add("tag");
-  tag.textContent = textContent;
-  document.body.appendChild(tag);
-  tag.adjustTagPosition = () => {
-    queueMicrotask(() => adjustElementPosition(tag, el));
-  };
-  tag.adjustTagPosition();
-}
-
-/** @param file {File} */
-function handleLoadFile(file) {
-  if (file) {
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-      let fileContent = event.target.result;
-      fileContent = fileContent.replaceAll("\r\n", "\n"); // If don't replace then it won't break the line.
-      if (fileContent.includes("�")) {
-        reader.readAsText(file, "big5");
-        return;
-      }
-      try {
-        const annotationDoc = JSON.parse(fileContent);
-        if (
-          documentStore.has(annotationDoc.id) &&
-          confirm(
-            `標記檔 ${annotationDoc.filename} 已經存在，要取代現有的檔案嗎？`,
-          )
-        ) {
-          $(`.documentContainer[data-id="${annotationDoc.id}"]`).remove();
-          $$(`.tag[data-document-id="${annotationDoc.id}"]`).forEach((el) =>
-            el.remove(),
-          );
-          documentStore.set(annotationDoc);
+      reader.onload = (event) => {
+        let fileContent = event.target.result;
+        fileContent = fileContent.replaceAll("\r\n", "\n"); // If don't replace then it won't break the line.
+        if (fileContent.includes("�")) {
+          reader.readAsText(file, "big5");
+          return;
         }
-        insertAnnotationDoc(annotationDoc);
-      } catch (error) {
-        // plain text
-        const annotationDoc = new AnnotationDoc(
-          null,
-          file.name,
-          fileContent,
-          null,
-        );
-        insertAnnotationDoc(annotationDoc);
-      }
-    };
+        callback(fileContent);
+      };
 
-    reader.readAsText(file);
-  } else {
-    console.warn("No file selected.");
-  }
+      reader.readAsText(file);
+    } else {
+      console.warn("No file selected.");
+    }
+  };
 }
 
 /**
@@ -104,14 +57,21 @@ function insertAnnotationDoc(annotationDoc) {
 
   documentContainer.dataset.id = annotationDoc.id;
   header.textContent = "📝" + annotationDoc.filename;
-  content.textContent = annotationDoc.text;
+  if (annotationDoc.type == "xml") {
+    content.append(
+      new DOMParser().parseFromString(annotationDoc.text, "text/xml")
+        .documentElement,
+    );
+  } else if (annotationDoc.type == "plain text") {
+    content.textContent = annotationDoc.text;
+  }
   content.on("scroll", () => {
-    $$(content, ".tag").forEach((tag) => tag.adjustTagPosition());
+    $$(content, ".tag").do((tag) => tag.adjustPosition());
   });
   // We need to append container into document first before initializing Recogito.
   container.landing("documents");
 
-  const r = new Recogito({ content });
+  const r = new Recogito({ content, mode: "pre" });
 
   if (annotationDoc.annotations.length != 0) {
     r.setAnnotations(annotationDoc.annotations);
@@ -123,12 +83,10 @@ function insertAnnotationDoc(annotationDoc) {
           // retry addTag
           setTimeout(() => addTag(), 10);
         } else {
-          addTagForElement(
-            el,
-            annotationBodyToString(annotation.body),
-            annotationDoc.id,
-            annotation.id,
-          );
+          addTagForElement(el, annotationBodyToString(annotation.body), {
+            documentId: annotationDoc.id,
+            annotationId: annotation.id,
+          });
         }
       };
       addTag();
@@ -137,12 +95,10 @@ function insertAnnotationDoc(annotationDoc) {
 
   r.on("createAnnotation", async (annotation, overrideId) => {
     const el = $(`[data-id="${annotation.id}"]`);
-    addTagForElement(
-      el,
-      annotationBodyToString(annotation.body),
-      annotationDoc.id,
-      annotation.id,
-    );
+    addTagForElement(el, annotationBodyToString(annotation.body), {
+      documentId: annotationDoc.id,
+      annotationId: annotation.id,
+    });
   });
   r.on("deleteAnnotation", async (annotation) => {
     $(`.tag[data-annotation-id="${annotation.id}"]`).remove();
@@ -150,6 +106,18 @@ function insertAnnotationDoc(annotationDoc) {
   r.on("updateAnnotation", async (annotation, previous) => {
     $(`.tag[data-annotation-id="${annotation.id}"]`).textContent =
       annotationBodyToString(annotation.body);
+  });
+  r.on("selectAnnotation", async (annotation) => {
+    const cui = annotation.body.find(
+      ({ purpose }) => purpose == "tagging",
+    ).value;
+    $$(".conceptRepresentation").do((e) =>
+      e.dispatchEvent(
+        new CustomEvent("selectannotation", {
+          detail: { cui },
+        }),
+      ),
+    );
   });
 
   saveBtn.on("click", () => {
@@ -168,9 +136,7 @@ function insertAnnotationDoc(annotationDoc) {
       r.destroy();
       documentStore.delete(annotationDoc.id);
       documentContainer.remove();
-      $$(`.tag[data-document-id="${annotationDoc.id}"]`).forEach((el) =>
-        el.remove(),
-      );
+      $$(`.tag[data-document-id="${annotationDoc.id}"]`).kill();
     }
   });
 }
@@ -455,20 +421,6 @@ function annotationBodyToString(body) {
     .join(", ");
 }
 
-// get document coordinates of the element
-function getCoords(el) {
-  let box = el.getBoundingClientRect();
-
-  return {
-    top: box.top + scrollY,
-    right: box.right + scrollX,
-    bottom: box.bottom + scrollY,
-    left: box.left + scrollX,
-    width: box.width,
-    height: box.height,
-  };
-}
-
 function insertConceptToBookmark(concept, ignoreDuplicates = false) {
   if (!ignoreDuplicates && bookmarkStore.has(concept)) {
     alert("概念已經在常用中");
@@ -504,6 +456,20 @@ function insertConceptToBookmark(concept, ignoreDuplicates = false) {
         conceptRepresentation.classList.remove("highlight");
       }
     });
+  });
+  conceptRepresentation.on("selectannotation", (e) => {
+    if (concept.cui == e.detail.cui) {
+      let clickCount = 0;
+      const removeHighlight = () => {
+        clickCount++;
+        if (clickCount == 2) {
+          $("body").off("click", removeHighlight);
+          conceptRepresentation.classList.remove("highlight");
+        }
+      };
+      $("body").on("click", removeHighlight);
+      conceptRepresentation.classList.add("highlight");
+    }
   });
   representation.landing("bookmarks");
   if (!ignoreDuplicates) {
@@ -546,7 +512,7 @@ function openUpHeavenAndEarth() {
       const target = mutationRecord.target;
       if (target.classList.contains("r6o-selection")) {
         searchConcept(target.textContent);
-        $$(".conceptRepresentation").forEach((e) =>
+        $$(".conceptRepresentation").do((e) =>
           e.dispatchEvent(
             new CustomEvent("selecttext", {
               detail: { text: target.textContent },
@@ -582,9 +548,7 @@ function openUpHeavenAndEarth() {
       }
       try {
         msg("搜尋中...");
-        const response = await fetch(UMLS_BASE_URL + "/umls/concepts/" + text);
-        const json = await response.json();
-        const concept = json.data;
+        const concept = await getConceptByCui(text);
         if (concept) {
           insertConceptToBookmark(concept);
           msg("　");
@@ -596,7 +560,7 @@ function openUpHeavenAndEarth() {
   });
 
   // handle toggle drawer
-  $$(".toggleDrawer").forEach((el) => {
+  $$(".toggleDrawer").do((el) => {
     el.on("click", (e) => {
       if (e.srcElement == el) {
         const drawer = $(
@@ -616,182 +580,109 @@ function openUpHeavenAndEarth() {
 
   // adjust tags position when window resize
   window.on("resize", () => {
-    $$(".tag").forEach((tag) => tag.adjustTagPosition());
+    $$(".tag").do((tag) => tag.adjustPosition());
   });
 
-  $(".tutorialBtn").on("click", startTutorial);
+  $(".tutorialBtn").on("click", () => {
+    initTutorialData();
+    startTutorial();
+  });
 
-  $("file-dropzone").handleLoadFile = handleLoadFile;
+  $("file-dropzone").handleLoadFile = createHandleLoadFile((fileContent) => {
+    try {
+      const annotationDoc = JSON.parse(fileContent);
+      if (
+        documentStore.has(annotationDoc.id) &&
+        confirm(
+          `標記檔 ${annotationDoc.filename} 已經存在，要取代現有的檔案嗎？`,
+        )
+      ) {
+        $(`.documentContainer[data-id="${annotationDoc.id}"]`).remove();
+        $$(`.tag[data-document-id="${annotationDoc.id}"]`).kill();
+        documentStore.set(annotationDoc);
+      }
+      insertAnnotationDoc(annotationDoc);
+    } catch (error) {
+      // plain text
+      const annotationDoc = new AnnotationDoc(
+        null,
+        file.name,
+        fileContent,
+        null,
+      );
+      insertAnnotationDoc(annotationDoc);
+    }
+  });
+
+  // handle import pack
+  const fileInput = $(".importPackFile");
+  $(".importPackBtn").on("click", () => {
+    fileInput.click();
+  });
+  const handleLoadPack = createHandleLoadFile((fileContent) => {
+    try {
+      const pack = JSON.parse(fileContent);
+      if (Array.isArray(pack?.documents) && Array.isArray(pack?.bookmarks)) {
+        resetWorkspace();
+        pack.documents.forEach(documentStore.set.bind(documentStore));
+        pack.documents.forEach(insertAnnotationDoc);
+        pack.bookmarks.forEach(bookmarkStore.add.bind(bookmarkStore));
+        pack.bookmarks.forEach((b) => insertConceptToBookmark(b, true));
+      } else {
+        throw Error("Expecting pack.documents and pack.bookmarks to be array.");
+      }
+    } catch (error) {
+      alert("匯入格式有誤");
+      console.error(error);
+    }
+  });
+  fileInput.addEventListener("change", (event) => {
+    const selectedFile = event.target.files[0];
+    handleLoadPack(selectedFile);
+  });
+  function resetWorkspace() {
+    cleanHtml();
+    documentStore.deleteAll();
+    bookmarkStore.deleteAll();
+  }
+
+  $(".resetWorkspaceBtn").on("click", resetWorkspace);
 }
 openUpHeavenAndEarth();
 initFromLocalStorage();
 
-let isHelpNeeded = localStorage.getItem("isHelpNeeded");
-if (isHelpNeeded == "false") {
-  isHelpNeeded = false;
-} else {
-  isHelpNeeded = true;
+function initTutorialData() {
+  cleanHtml();
+  createConcept(data.concept).landing("concepts");
+  insertConceptToBookmark(data.concept, true);
+  insertAnnotationDoc(data.annotationDoc);
 }
 
-if (isHelpNeeded) {
+function cleanHtml() {
+  $$(".tag").kill();
+  $('[name="concepts"]').innerHTML = "";
+  $('[name="bookmarks"]').innerHTML = "";
+  $('[name="documents"]').innerHTML = "";
+}
+
+if (shouldStartTutorial()) {
+  initTutorialData();
   startTutorial();
 }
-function startTutorial() {
-  // init data
-  $$(".tag").forEach((el) => el.remove());
-  $('[name="concepts"]').innerHTML = "";
-  createConcept(data.concept).landing("concepts")
 
-  $('[name="bookmarks"]').innerHTML = "";
-  insertConceptToBookmark(data.concept, true);
-
-  $('[name="documents"]').innerHTML = "";
-  insertAnnotationDoc(data.annotationDoc);
-
-  const driverObj = driver({
-    showProgress: true,
-    animate: false,
-    showButtons: ["next", "previous", "close"],
-    popoverClass: "myDriverTheme",
-    steps: [
-      {
-        element: "file-dropzone",
-        popover: {
-          description: "點擊或拖曳上傳標記文件",
-        },
-      },
-      {
-        element: ".documentContainer",
-        popover: {
-          description: "標記文件區塊",
-        },
-      },
-      {
-        element: ".documentContainer .content",
-        popover: {
-          description: `<img alt="標記方法" src="${triggerTagDialogUrl}" width="487px" height="213px"></img><div>點擊兩下選擇一個字<br/>點選並拖曳可標記任意範圍的文字</div>`,
-        },
-      },
-      {
-        element: ".documentContainer .r6o-annotation",
-        popover: {
-          description:
-            '<span class="r6o-annotation">黃色</span>：標記內容<br/><span style="color:#4485ea">藍色文字</span>：所屬標籤',
-        },
-      },
-      {
-        element: ".documentContainer .exportBtn",
-        popover: {
-          description: "標記結果另存新檔",
-          side: "bottom",
-        },
-      },
-      {
-        element: ".documentContainer .saveBtn",
-        popover: {
-          description: "暫存文件避免頁面關掉後遺失資料",
-          side: "bottom",
-        },
-      },
-      {
-        element: ".documentContainer .deleteBtn",
-        popover: {
-          description: "刪除文件",
-          side: "bottom",
-        },
-      },
-      {
-        element: ".drawer[data-drawer-position='right']",
-        popover: {
-          description: "UMLS搜尋面板",
-        },
-      },
-      {
-        element: "#searchBar",
-        popover: {
-          description: "在這裡輸入關鍵字或CUI",
-        },
-      },
-      {
-        element: "#searchOnSelectionContainer",
-        popover: {
-          description: `<img alt="勾選與未勾選的差異" src="${searchOnSelectionUrl}" width="728px"></img><div>勾選此項時，在正中央的標記區塊選擇文字時就會自動帶入關鍵字搜尋概念</div>`,
-        },
-      },
-      {
-        element: ".concept .conceptRepresentation",
-        popover: {
-          description: "Concept Unique Identifier（CUI）及preferred name",
-        },
-      },
-      {
-        element: ".concept .importCuiBtn",
-        popover: {
-          description: `<img alt="匯入CUI" src="${importCuiUrl}" width="727px"></img><div>選取要標記的文字後，點擊按鈕自動填入CUI標籤</div>`,
-        },
-      },
-      {
-        element: ".concept .bookmarkCuiBtn",
-        popover: {
-          description: `<img alt="加入常用CUI" src="${addToBookmarkUrl}" width="728px"></img><div>加入到常用概念</div>`,
-        },
-      },
-      {
-        element: ".concept .copyCuiBtn",
-        popover: {
-          description: "複製CUI到剪貼簿",
-        },
-      },
-      {
-        element: ".concept .cui",
-        popover: {
-          description: "新分頁開啟UMLS概念條目",
-        },
-      },
-      {
-        element: '.drawer[data-drawer-position="left"]',
-        popover: {
-          description: "常用概念面板",
-        },
-      },
-      {
-        element:
-          '.drawer[data-drawer-position="left"] .addCuiBookmarkContainer',
-        popover: {
-          description: `<img alt="輸入CUI加入常用概念" src="${manualInputCuiUrl}" width="359px"></img><div>輸入CUI加入常用概念</div>`,
-        },
-      },
-      {
-        element: '.drawer[data-drawer-position="left"] .conceptRepresentation',
-        popover: {
-          description: `<img alt="選取文字，相關概念變紅色" src="${highlightOnSelectionUrl}" width="806px"></img><div>當選取文字時，有關的概念會變成紅色</div>`,
-        },
-      },
-      {
-        element: '.drawer[data-drawer-position="left"] .removeBookmarkBtn',
-        popover: {
-          description: "從常用概念中移除",
-        },
-      },
-      {
-        element: '.drawer[data-drawer-position="left"] .searchCuiBtn',
-        popover: {
-          description: `<img alt="搜尋概念" src="${searchCuiBtnUrl}" width="740px"></img><div>搜尋概念</div>`,
-        },
-      },
-    ],
-    onDestroyed: () => {
-      $('[name="concepts"]').innerHTML = "";
-      $('[name="bookmarks"]').innerHTML = "";
-      $('[name="documents"]').innerHTML = "";
-      $$(".tag").forEach((el) => el.remove());
-
-      isHelpNeeded = false;
-      localStorage.setItem("isHelpNeeded", isHelpNeeded.toString());
-    },
-    nextBtnText: "下一步",
-    prevBtnText: "上一步",
-    doneBtnText: "結束",
-  });
-  driverObj.drive();
+async function getConceptByCui(cui) {
+  const response = await fetch(UMLS_BASE_URL + "/umls/concepts/" + cui);
+  const json = await response.json();
+  const concept = json.data;
+  return concept;
 }
+
+// window.getCuiList = async (list) => {
+//   const concepts = list.trim().split("\n");
+//   const result = [];
+//   for (const cui of concepts) {
+//     const concept = await getConceptByCui(cui);
+//     result.push(concept);
+//   }
+//   console.log(result)
+// };
