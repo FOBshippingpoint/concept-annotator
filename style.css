@@ -10,7 +10,6 @@
   opacity: 1;
 }
 
-
 .documentContainer {
   padding: 0 1.4rem;
   border: 1px solid #222;
@@ -18,12 +17,11 @@
 }
 
 .documentContainer + .documentContainer {
-  margin-top: 1em
+  margin-top: 1em;
 }
 
 .content {
-  line-height: 3;
-  overflow-x: scroll;
+  overflow: visible;
   white-space: pre-wrap;
 }
 
@@ -354,4 +352,45 @@ h4 {
 
 .driver-popover.myDriverTheme:has(img) {
   max-width: unset;
+}
+
+/* Style for all elements with class "r6o-annotation" */
+.r6o-annotation {
+  position: relative;
+  cursor: pointer;
+}
+
+.r6o-annotation[data-negated="true"]::before {
+  content: "NEG";
+  margin: 0 5px 0 2px;
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.r6o-annotation[data-negated="true"] {
+  background-color: #f8d7da;
+}
+
+/* Popover styles */
+.r6o-annotation::after {
+  content: attr(data-popover-content);
+  visibility: hidden;
+  background-color: #555;
+  color: #fff;
+  font-family: "Times New Roman", Times, serif;
+  text-align: center;
+  border-radius: 4px;
+  padding: 4px 8px;
+  position: absolute;
+  z-index: 9999999999999999999;
+  bottom: 150%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  white-space: nowrap; /* Add this line */
+}
+
+.r6o-annotation:hover::after {
+  visibility: visible;
+  opacity: 1;
 }

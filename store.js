@@ -89,15 +89,17 @@ export const bookmarkStore = {
  * @property {string} text
  * @property {Object} annotations
  * @property {string} id - Date.now() string in milliseconds
+ * @property {('plain text'|'xml')} type - Date.now() string in milliseconds
  * @property {string} filename
  */
 
 /**
  * @returns {AnnotationDoc}
  */
-export function AnnotationDoc(id, filename, text, annotations) {
+export function AnnotationDoc(id, filename, text, annotations, type) {
   this.id = id;
   this.filename = filename;
   this.text = text;
+  this.type = type;
   this.annotations = annotations;
 }

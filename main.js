@@ -6,7 +6,7 @@ import debounce from "./debounce.js";
 import { documentStore, bookmarkStore, AnnotationDoc } from "./store.js";
 import { cloneTemplate } from "./templater.js";
 import { cache, isCached } from "./cache.js";
-import { addTagForElement } from "./tag.js";
+import { updatePopoverContent } from "./tag.js";
 import { shouldStartTutorial, startTutorial } from "./driver.js";
 import { data } from "./data.js";
 
@@ -15,7 +15,7 @@ const UMLS_BASE_URL = import.meta.env.VITE_UMLS_BASE_URL ?? "";
 /**
  * @param callback {Function}
  */
-function createHandleLoadFile(callback) {
+function createHandleLoadFileFunc(callback) {
   return (file) => {
     if (file) {
       const reader = new FileReader();
@@ -27,7 +27,7 @@ function createHandleLoadFile(callback) {
           reader.readAsText(file, "big5");
           return;
         }
-        callback(fileContent);
+        callback(file, fileContent);
       };
 
       reader.readAsText(file);
@@ -48,6 +48,7 @@ function insertAnnotationDoc(annotationDoc) {
       annotationDoc.filename,
       annotationDoc.text,
       [],
+      "plain text",
     );
   }
 
@@ -65,9 +66,6 @@ function insertAnnotationDoc(annotationDoc) {
   } else if (annotationDoc.type == "plain text") {
     content.textContent = annotationDoc.text;
   }
-  content.on("scroll", () => {
-    $$(content, ".tag").do((tag) => tag.adjustPosition());
-  });
   // We need to append container into document first before initializing Recogito.
   container.landing("documents");
 
@@ -83,10 +81,7 @@ function insertAnnotationDoc(annotationDoc) {
           // retry addTag
           setTimeout(() => addTag(), 10);
         } else {
-          addTagForElement(el, annotationBodyToString(annotation.body), {
-            documentId: annotationDoc.id,
-            annotationId: annotation.id,
-          });
+          updatePopoverContent(el, annotation);
         }
       };
       addTag();
@@ -95,17 +90,11 @@ function insertAnnotationDoc(annotationDoc) {
 
   r.on("createAnnotation", async (annotation, overrideId) => {
     const el = $(`[data-id="${annotation.id}"]`);
-    addTagForElement(el, annotationBodyToString(annotation.body), {
-      documentId: annotationDoc.id,
-      annotationId: annotation.id,
-    });
-  });
-  r.on("deleteAnnotation", async (annotation) => {
-    $(`.tag[data-annotation-id="${annotation.id}"]`).remove();
+    updatePopoverContent(el, annotation);
   });
   r.on("updateAnnotation", async (annotation, previous) => {
-    $(`.tag[data-annotation-id="${annotation.id}"]`).textContent =
-      annotationBodyToString(annotation.body);
+    const el = $(`[data-id="${annotation.id}"]`);
+    updatePopoverContent(el, annotation);
   });
   r.on("selectAnnotation", async (annotation) => {
     const cui = annotation.body.find(
@@ -136,7 +125,6 @@ function insertAnnotationDoc(annotationDoc) {
       r.destroy();
       documentStore.delete(annotationDoc.id);
       documentContainer.remove();
-      $$(`.tag[data-document-id="${annotationDoc.id}"]`).kill();
     }
   });
 }
@@ -414,12 +402,6 @@ const debouncedUpdateConcepts = debounce(updateConcepts);
  * @property {null} narrowerConcepts.definition.sourceName
  */
 
-function annotationBodyToString(body) {
-  return body
-    .filter(({ purpose }) => purpose == "tagging")
-    .map(({ value }) => value)
-    .join(", ");
-}
 
 function insertConceptToBookmark(concept, ignoreDuplicates = false) {
   if (!ignoreDuplicates && bookmarkStore.has(concept)) {
@@ -578,48 +560,39 @@ function openUpHeavenAndEarth() {
     });
   });
 
-  // adjust tags position when window resize
-  window.on("resize", () => {
-    $$(".tag").do((tag) => tag.adjustPosition());
-  });
-
   $(".tutorialBtn").on("click", () => {
     initTutorialData();
     startTutorial();
   });
 
-  $("file-dropzone").handleLoadFile = createHandleLoadFile((fileContent) => {
-    try {
-      const annotationDoc = JSON.parse(fileContent);
-      if (
-        documentStore.has(annotationDoc.id) &&
-        confirm(
-          `標記檔 ${annotationDoc.filename} 已經存在，要取代現有的檔案嗎？`,
-        )
-      ) {
-        $(`.documentContainer[data-id="${annotationDoc.id}"]`).remove();
-        $$(`.tag[data-document-id="${annotationDoc.id}"]`).kill();
-        documentStore.set(annotationDoc);
+  $("file-dropzone").handleLoadFile = createHandleLoadFileFunc(
+    (file, fileContent) => {
+      try {
+        const annotationDoc = JSON.parse(fileContent);
+        if (
+          documentStore.has(annotationDoc.id) &&
+          confirm(
+            `標記檔 ${annotationDoc.filename} 已經存在，要取代現有的檔案嗎？`,
+          )
+        ) {
+          $(`.documentContainer[data-id="${annotationDoc.id}"]`).remove();
+          documentStore.set(annotationDoc);
+        }
+        insertAnnotationDoc(annotationDoc);
+      } catch (error) {
+        // plain text
+        const annotationDoc = new AnnotationDoc(null, file.name, fileContent);
+        insertAnnotationDoc(annotationDoc);
       }
-      insertAnnotationDoc(annotationDoc);
-    } catch (error) {
-      // plain text
-      const annotationDoc = new AnnotationDoc(
-        null,
-        file.name,
-        fileContent,
-        null,
-      );
-      insertAnnotationDoc(annotationDoc);
-    }
-  });
+    },
+  );
 
   // handle import pack
   const fileInput = $(".importPackFile");
   $(".importPackBtn").on("click", () => {
     fileInput.click();
   });
-  const handleLoadPack = createHandleLoadFile((fileContent) => {
+  const handleLoadPack = createHandleLoadFileFunc((file, fileContent) => {
     try {
       const pack = JSON.parse(fileContent);
       if (Array.isArray(pack?.documents) && Array.isArray(pack?.bookmarks)) {
@@ -659,7 +632,6 @@ function initTutorialData() {
 }
 
 function cleanHtml() {
-  $$(".tag").kill();
   $('[name="concepts"]').innerHTML = "";
   $('[name="bookmarks"]').innerHTML = "";
   $('[name="documents"]').innerHTML = "";

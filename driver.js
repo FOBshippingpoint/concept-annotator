@@ -1,3 +1,5 @@
+// driver.js
+// Define how tutorial goes.
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import triggerTagDialogUrl from "/triggerTagDialog.gif";
