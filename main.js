@@ -402,7 +402,6 @@ const debouncedUpdateConcepts = debounce(updateConcepts);
  * @property {null} narrowerConcepts.definition.sourceName
  */
 
-
 function insertConceptToBookmark(concept, ignoreDuplicates = false) {
   if (!ignoreDuplicates && bookmarkStore.has(concept)) {
     alert("概念已經在常用中");
@@ -599,8 +598,9 @@ function openUpHeavenAndEarth() {
         resetWorkspace();
         pack.documents.forEach(documentStore.set.bind(documentStore));
         pack.documents.forEach(insertAnnotationDoc);
-        pack.bookmarks.forEach(bookmarkStore.add.bind(bookmarkStore));
-        pack.bookmarks.forEach((b) => insertConceptToBookmark(b, true));
+        // 應醫師要求，不覆蓋書籤
+        // pack.bookmarks.forEach(bookmarkStore.add.bind(bookmarkStore));
+        // pack.bookmarks.forEach((b) => insertConceptToBookmark(b, true));
       } else {
         throw Error("Expecting pack.documents and pack.bookmarks to be array.");
       }
@@ -616,7 +616,8 @@ function openUpHeavenAndEarth() {
   function resetWorkspace() {
     cleanHtml();
     documentStore.deleteAll();
-    bookmarkStore.deleteAll();
+    // 應醫師要求，不刪除書籤
+    // bookmarkStore.deleteAll();
   }
 
   $(".resetWorkspaceBtn").on("click", resetWorkspace);
@@ -633,7 +634,8 @@ function initTutorialData() {
 
 function cleanHtml() {
   $('[name="concepts"]').innerHTML = "";
-  $('[name="bookmarks"]').innerHTML = "";
+    // 應醫師要求，不刪除書籤
+  // $('[name="bookmarks"]').innerHTML = "";
   $('[name="documents"]').innerHTML = "";
 }
 
